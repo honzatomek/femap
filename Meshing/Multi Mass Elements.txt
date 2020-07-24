@@ -1,0 +1,5 @@
+FEMAP BASIC API Program - Multi Mass Elements
+
+This programs makes it possible to select multiple nodes and create a Mass Element
+at each of them, instead of doing it one at a time.
+

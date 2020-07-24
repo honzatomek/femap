@@ -1,0 +1,3 @@
+This API program will iterate modifying the plate thickness based on a user defined range and a number of 
+iterations. Open the callback.mod model and run the API Startloop to start the process.  This API works in conjunction with callback.bas to modify 
+the property, run NX Nastran and wait for a result before resubmitting the job with the next thickness value.

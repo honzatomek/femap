@@ -1,0 +1,18 @@
+This command allows you to create a PSHELL Property for Nastran which represents Honeycomb composite panel.
+
+All you need to know is the thicknesses of the Face Sheets and Honeycomb Core, the Nominal Density of the Core, and have the materials for the Face Sheets and Core already defined in a FEMAP model.  The program will then calculate the 12I/T^3 term, the Ts/T term, and the NSM term from the values entered and apply the correct materials for MID1, MID2, and MID3 on the PSHELL card.
+
+The theory behind using this method for Honeycomb panels can be found here:
+
+http://femci.gsfc.nasa.gov/hcplate/Honeycomb_Pshell.html
+
+and in this directory as:
+
+FEMCI Book - Honeycomb PSHELL Cards.mht
+
+Please copy all the contents of this folder into one location as this will assure that the picture in the dialog box will be visible.
+
+
+
+
+

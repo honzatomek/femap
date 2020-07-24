@@ -1,0 +1,15 @@
+This API determines if conditions exist regarding Rigid elements (RBE2s and RBE3s) which will cause Nastran to fail unless PARAM,AUTOMPC is used.
+
+The three conditions it will report to the messages window are:
+
+Node ID "#" is a RBE2 Dependent node in both elements "A" and "B"
+
+Node ID "#" is a RBE3 Reference node in both elements "A" and "B"
+
+Node ID "#" is the RBE3 Reference Node of element "A" and a RBE2 dependent node of element "B"
+
+One other condition is commented out, but can be used by removing the ' in front of all of the lines.  It will report when:
+
+Node ID "#" is the RBE2 Independent Node of element "A" and a RBE3 node to average of element "B"
+
+This condition does not appear to effect Nastran.

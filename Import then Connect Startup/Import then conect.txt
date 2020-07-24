@@ -1,0 +1,3 @@
+This API can be called as a start-up program file and immediately prompts an import of geometry, then runs a program file silently to create automatic connections with the default values.
+
+Useful when showing a demo to design space users.

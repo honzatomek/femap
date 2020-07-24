@@ -1,0 +1,3 @@
+This API program will convert selected non-interpolation rigid elements (RBE2 elements)
+to interpolation RBE3 rigid elements with an interpolation factor of 1.0.  You can
+edit the script and easily change the interpolation factor to anything you wish.

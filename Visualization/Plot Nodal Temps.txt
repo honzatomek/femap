@@ -1,0 +1,5 @@
+Plot Nodal Temps
+
+This API creates a new output set, and creates nodal temperature output values at each node
+that has nodal temperature loads.  It then automatically goes to a contour plot of this 
+new temperature data.  The user can then press Yes to delete the data, or No to keep it.

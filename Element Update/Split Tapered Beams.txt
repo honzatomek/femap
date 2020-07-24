@@ -1,0 +1,4 @@
+In Split Taper Beam, you choose an existing beam element (taper or no taper) and it will split the beam using an entered “percentage of element length” and then recalculate the intermediate cross-section.
+
+ 
+Note: These functions work with symmetric cross-sections (I-Beam, Box...).

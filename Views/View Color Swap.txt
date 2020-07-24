@@ -1,0 +1,6 @@
+This API will do a quick flip from the FEMAP standard background
+to a white background with most of the text flipped to black.  
+Running it again will swap back.  To use this most effectively, 
+connect the API to a custom toolbar button.  For instructions on how
+to do this, please see Help - Toolbars - Customization from the main
+FEMAP menu.

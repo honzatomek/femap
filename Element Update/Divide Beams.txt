@@ -1,0 +1,4 @@
+In Divide Beams, you choose an existing beam element (taper or no taper) and it will split the beam into a desired number of segments and recalculate the intermediate cross-sections.
+
+
+Note: These functions work with symmetric cross-sections (I-Beam, Box...).

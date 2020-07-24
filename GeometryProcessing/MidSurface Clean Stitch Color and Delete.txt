@@ -1,0 +1,16 @@
+Mid-Surface Clean Stitch Color and Delete.BAS
+
+Asks the user to select a solid, and then does a mid-surface, cleanup, stitch, color
+to match the original solid and then deletes the original solid.  For sheet-metal like 
+geometry, where mid-surfacing is totally automatic, this API automates a typical 
+mid-surface workflow.
+
+The API the automatic mid-surface thickness (distance within which the algorithm looks 
+for matching faces) hard coded to 0.25.  If you are working with different sized geometry, 
+or geometry in a different units system, you should edit this to be the value one would 
+typically type in the automatic mid-surface command.
+
+There is a sample Parasolid geometry file, PSOL3_ASSY.X_T in the FEMAP examples directory.  
+If you are set to inches in File – Preferences – Geometry, then this API will allow you 
+to pick each solid and quickly get a clean, stitched, color-matching mid-surface of each 
+of the components.

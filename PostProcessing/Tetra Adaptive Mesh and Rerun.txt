@@ -1,0 +1,8 @@
+This API assumes that you have a solid that has been meshed and already run the first time.
+
+It will use the VonMises stresses from the first one, and increase the mesh density of any curve
+attached to an element that has a stress gradient from the element centroid to one of its nodes
+of more than 10%. 
+
+The mesh sizes on these curves are increased 40%, the mesh is deleted and the model re-run.
+

@@ -1,0 +1,8 @@
+This API is designed for shell/mid-surface FEA models.  It is limited to connecting two 
+circular holes, made up of two sets of curves.  
+
+The API asks the user to select two sets of curves.  From the first set, first curve, 
+it finds the diameter of the hole.  It then uses this, and the active material, to 
+create, or locate and existing beam property.  It then creates two rigid spiders and 
+connects them with an element using the property.
+

@@ -1,0 +1,11 @@
+ExportNodalTempsToExcel
+
+This API is an excellent example of walking output data in FEMAP and sending it over to Microsoft Excel.  
+This API is designed for exporting the results of a transient thermal run, where there are multiple output 
+sets of temperature data at nodes, the API asks the user to select nodes, and then sends the temperatures 
+for these nodes to Excel for every output set.
+
+This API relies on the FEMAP API programming environment knowing about the Excel application object. If you 
+have not loaded the reference to the Excel API, you need to right click in the API Programming window, select 
+the "References" option, and select the "Microsoft Excel 11.0 Object Library".
+

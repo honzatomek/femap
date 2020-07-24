@@ -1,0 +1,8 @@
+TempGradInX
+TempGradInY
+TempGradInZ
+
+Applied a user specified temperature gradient in global X, Y, or Z.  One can input the
+base temperature, and then the gradient.  The API figures out the min/max coordindate values,
+and then linearly interpolates and creates a temperature value for each node in the current
+load set.

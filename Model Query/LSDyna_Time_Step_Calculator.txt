@@ -1,0 +1,6 @@
+FEMAP API - LSDyna_Time_Step_Calculator.bas
+
+This API walks selected shell elements and uses the edge lengths of the element, combined with
+the element's material properties and area to calculate the minimum time step for LS-Dyna.
+
+Calculation provided by George Laird, Predictive Engineering.

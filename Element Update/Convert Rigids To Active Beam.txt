@@ -1,0 +1,4 @@
+This API program will convert selected rigid elements into multiple beam 
+elements connected the independent node from the rigid with each of its
+dependent nodes.  Use Tools - Parameters in FEMAP to set the beam property
+to use as active and then run the API.

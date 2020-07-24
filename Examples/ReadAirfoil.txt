@@ -1,0 +1,4 @@
+ReadAirfoil.bas
+
+This API reads in the file NACA2411.txt and for each 2-D airfoil data point in the file creates
+a FEMAP point.

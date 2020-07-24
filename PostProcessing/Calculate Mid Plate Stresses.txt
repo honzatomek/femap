@@ -1,0 +1,5 @@
+Calculate Mid Plate Stresses
+
+This API simply calculates an average of the TopX/BotX and TopY/BotY Stresses and
+creates two corresponding output vectors in the current output set.
+
