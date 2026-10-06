@@ -1,82 +1,70 @@
+' =============================================================================
+' Description: Switches the RBE2 reference node with its first listed dependent node.
+' Compatibility: Nastran for Windows 2004 and modern FEMAP.
+' =============================================================================
+
 Option Explicit
 
-'Script to switch RBE2 Master and Slave Nodes
-Const DBUG As Boolean = False
-Private StartTime As Double
+' Switches the reference node of a rigid element with its first listed node.
+' Written against the common N4W 2004 / modern FEMAP BASIC/API subset.
+
+Const C_FE_OK As Long = -1
+Const C_FT_ELEM As Long = 8
+Const C_FET_RIGID As Long = 29
+Const C_FTO_RIGID As Long = 13
+Const C_FCM_NORMAL As Long = 0
 
 Sub Main
-    Dim App As femap.model
-    Set App = feFemap()
-    Dim rc As Long, i As Long
-
-    If DBUG Then
-    	On Error GoTo 0
-    Else
-    	On Error GoTo ExitHere
-    End If
-
-    StartTime = Timer
+    Dim App As Object
+    Set App = feGetObject()
 
     Dim el As Object
-    Set el = App.feElem
+    Dim pick As Object
     Dim elID As Long
-
-    Dim s As Object
-    Set s = App.feSet()
-    Dim ns As Object
-    Set ns = App.feSet()
-
-    Dim ndold As Long
-    Dim ndnew As Long
-
+    Dim rc As Long
+    Dim count As Long
+    Dim oldRef As Long
+    Dim newRef As Long
     Dim ndcount As Long
     Dim nds As Variant
     Dim face As Variant
     Dim weight As Variant
-    Dim DOF As Variant
+    Dim dof As Variant
 
-    Dim c As Long
-    c = 0
+    Set el = App.feElem()
+    Set pick = App.feSet()
 
-    Do While s.SelectID(8, "Select RBE2 Element to Switch Master and Slave Nodes:", elID) = -1
-		rc = ns.Clear()
-    	rc = el.Get(elID)
-		pt("Selected element: " & elID & ", type = " & el.type & ", topology = " & el.topology, c + 1)
-		If (el.type = 29) And (el.topology = 13) Then
-			c = c + 1
-			rc = el.GetNodeList(0, ndcount, nds, face, weight, DOF)
-			ndold = el.Node(0)
-			el.Node(0) = nds(0)
-			nds(0) = ndold
-			rc = el.PutNodeList(0, ndcount, nds, face, weight, DOF)
-			rc = el.Put(elID)
-			If rc = -1 Then pt("Updated element " & elID & " by changing node " & ndold & " to node " & ndnew & ".", c)
-			feFemap.feViewRegenerate(1)
-		End If
+    On Error GoTo ErrorHandler
+
+    Do While pick.SelectID(C_FT_ELEM, "Select rigid element to switch reference and first listed node:", elID) = C_FE_OK
+        rc = el.Get(elID)
+        If rc = C_FE_OK Then
+            If (el.type = C_FET_RIGID) And (el.topology = C_FTO_RIGID) And (Not el.RigidInterpolate) Then
+                rc = el.GetNodeList(0, ndcount, nds, face, weight, dof)
+                If (rc = C_FE_OK) And (ndcount > 0) Then
+                    oldRef = el.Node(0)
+                    newRef = nds(0)
+                    el.Node(0) = newRef
+                    nds(0) = oldRef
+                    rc = el.PutNodeList(0, ndcount, nds, face, weight, dof)
+                    If rc = C_FE_OK Then rc = el.Put(elID)
+                    If rc = C_FE_OK Then
+                        count = count + 1
+                        Call App.feAppMessage(C_FCM_NORMAL, "Updated rigid element " & CStr(elID) & ": reference " & CStr(oldRef) & " -> " & CStr(newRef) & ".")
+                    End If
+                End If
+            End If
+        End If
+        Call App.feViewRegenerate(1)
     Loop
 
-    If c > 0 Then Call feFemap.feViewShow(8, s.ID)
+    GoTo ExitHere
+
+ErrorHandler:
+    MsgBox "Error " & CStr(Err.Number) & ": " & Err.Description
 
 ExitHere:
-	On Error Resume Next
-		Set el = Nothing
-		Set ns = Nothing
-		Set s = Nothing
-		Set App = Nothing
+    Set pick = Nothing
+    Set el = Nothing
+    Set App = Nothing
 End Sub
-
-Private Sub pt(ByVal message As String, Optional ByVal i As Long = 0, Optional ByVal debugging As Boolean = False)
-	'Dim App As femap.model
-	'Set App = feFemap
-	Dim rc As Long
-
-	If DBUG Then Debug.Print "["& i & "] - " & MinutesElapsed & " - " & message
-	If (Not debugging) Then	rc = feFemap.feAppMessage(FCM_NORMAL, "["& i & "] - " & MinutesElapsed & " - " & message)
-
-	'Set App = Nothing
-End Sub
-
-Private Function MinutesElapsed(Optional ByVal t As Double = 0) As String
-	If t = 0 Then t = StartTime
-	MinutesElapsed = Format((Timer - t) / 86400, "hh:mm:ss")
-End Function

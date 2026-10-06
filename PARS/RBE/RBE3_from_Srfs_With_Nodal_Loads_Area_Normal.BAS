@@ -1,133 +1,171 @@
+' =============================================================================
+' Description: Creates RBE3 spiders from selected surfaces and applies area-based nodal forces in the surface-normal direction.
+' Compatibility: Nastran for Windows 2004 and modern FEMAP.
+' =============================================================================
+
+Option Explicit
+
+' Creates one RBE3 per selected geometry surface and applies a nodal force at
+' the new dependent/reference node. Written against the common N4W 2004 /
+' modern FEMAP BASIC/API subset.
+
+Const C_FE_OK As Long = -1
+Const C_FT_SURFACE As Long = 5
+Const C_FET_RIGID As Long = 29
+Const C_FTO_RIGID As Long = 13
+Const C_RBE3_COLOR As Long = 122
+Const C_FCC_BOTH As Long = 2
+Const C_LOAD_FORCE As Long = 1
+
 Sub Main
-    Dim App As femap.model
-    Set App = feFemap()
+    Dim App As Object
+    Set App = feGetObject()
 
-	Dim srfset As Object
-	Set srfset = App.feSet()
-	Dim srfcount As Long
-	Dim vDOF As Variant
-	Dim srfID As Long
-	Dim srf As Object
-	Set srf = App.feSurface
-	'Dim srf As App.feSurface
-	'Dim crvs As App.feSet
-	'Dim crv As App.feCurve
-	'Dim pts As App.feSet
-	'Dim SPt As App.fePoint
-	'Dim nodes() As App.feNode
-	'Dim midnode As App.feNode
+    Dim srfset As Object
+    Dim srf As Object
+    Dim pt As Object
+    Dim nd As Object
+    Dim rb3 As Object
+    Dim ldset As Object
+    Dim ld As Object
+    Dim rc As Long
+    Dim srfID As Long
+    Dim numpoints As Long
+    Dim points As Variant
+    Dim midXYZ As Variant
+    Dim normal As Variant
+    Dim area As Double
+    Dim projectedArea As Double
+    Dim nlen As Double
+    Dim fx As Double
+    Dim fy As Double
+    Dim fz As Double
+    Dim i As Long
+    Dim ndID As Long
+    Dim refNodeID As Long
+    Dim elemID As Long
+    Dim loadID As Long
+    Dim loadSetID As Long
+    Dim nds() As Long
+    Dim face() As Long
+    Dim weight() As Double
+    Dim dof() As Long
 
-	Dim subdiv As Long
-	Dim rc As Long
-	Dim i As Long
-	Dim numpoints As Long
-	Dim points As Variant
-	Dim midXYZ As Variant
-	Dim nd As Object
-	Set	nd = App.feNode()
-	Dim ndset As Object
-	Set ndset = App.feSet()
-	Dim ndID As Long
-	Dim pt As Object
-	Set pt = App.fePoint()
-	Dim nds() As Long
-	Dim rb3 As Object
-	Set rb3 = App.feElem()
-	Dim DOF() As Long
-	Dim weight() As Double
+    Set srfset = App.feSet()
+    Set srf = App.feSurface()
+    Set pt = App.fePoint()
+    Set nd = App.feNode()
+    Set rb3 = App.feElem()
+    Set ldset = App.feLoadSet()
+    Set ld = App.feLoadMesh()
 
-	Dim LdSet As Object
-	Set LdSet = App.feLoadSet()
-	Dim LdSetID As Long
+    On Error GoTo ErrorHandler
 
-	Dim Ld As Object
-	Set Ld = App.feLoadMesh
-	Dim area As Double
-	Dim normal As Variant
+    rc = srfset.Select(C_FT_SURFACE, True, "Select surfaces to convert to RBE3 elements:")
+    If (rc <> C_FE_OK) Or (srfset.Count() = 0) Then GoTo ExitHere
 
-	LdSetID = LdSet.NextEmptyID()
-	LdSet.title = "RBE3 - Area"
-	rc = LdSet.Put(LdSetID)
+    loadSetID = ldset.NextEmptyID()
+    ldset.title = "RBE3 - Area - Normal"
+    rc = ldset.Put(loadSetID)
+    If rc <> C_FE_OK Then GoTo ExitHere
 
-	Dim eID As Long
+    rc = srfset.Reset()
+    srfID = srfset.Next()
+    Do While srfID <> 0
+        rc = srf.Get(srfID)
+        If rc = C_FE_OK Then
+            rc = srf.Points(C_FCC_BOTH, numpoints, points)
+            If (rc = C_FE_OK) And (numpoints >= 3) Then
+                rc = srf.cg(midXYZ)
+                If rc <> C_FE_OK Then GoTo NextSurface
+                rc = srf.Area(area)
+                If (rc <> C_FE_OK) Or (area <= 0#) Then GoTo NextSurface
 
-	rc = srfset.Select(5, True, "Select surfaces to convert to RBE3 Elements:")
+                ReDim nds(numpoints - 1)
+                ReDim face(numpoints - 1)
+                ReDim weight(numpoints - 1)
+                ReDim dof(numpoints * 6 - 1)
 
-	If rc = -1 Then
-		srfcount = srfset.Count()
-		If srfcount > 0 Then
-			rc = srfset.Reset()
-			srfID = srfset.Next()
-			Do While srfID <> 0
-				rc = srf.Get(srfID)
-				If rc <> -1 Then Exit Sub
-				rc = srf.Points(FCC_BOTH, numpoints, points)
-				If rc <> -1 Then Exit Sub
-				rc = srf.cg(midXYZ)
-				If rc <> -1 Then Exit Sub
-				ReDim nds(numpoints)
-				ReDim DOF(numpoints * 6)
-				ReDim weight(numpoints)
-				rc = srf.Area(area)
+                For i = 0 To numpoints - 1
+                    rc = pt.Get(points(i))
+                    If rc <> C_FE_OK Then GoTo NextSurface
+                    ndID = nd.NextEmptyID()
+                    nd.x = pt.x
+                    nd.y = pt.y
+                    nd.z = pt.z
+                    rc = nd.Put(ndID)
+                    If rc <> C_FE_OK Then GoTo NextSurface
 
-				For i = 0 To numpoints - 1
-					ndID = nd.NextEmptyID()
-					nds(i) = ndID
-					rc = pt.Get(points(i))
-					nd.x = pt.x
-					nd.y = pt.y
-					nd.z = pt.z
-					DOF(i * 6) = 1
-					DOF(i * 6 + 1) = 1
-					DOF(i * 6 + 2) = 1
-					DOF(i * 6 + 3) = 0
-					DOF(i * 6 + 4) = 0
-					DOF(i * 6 + 5) = 0
-					weight(i) = 1
-					rc = nd.Put(ndID)
-				Next
-				ndID = nd.NextEmptyID()
-				nd.x = midXYZ(0)
-				nd.y = midXYZ(1)
-				nd.z = midXYZ(2)
-				rc = nd.Put(ndID)
+                    nds(i) = ndID
+                    face(i) = 0
+                    weight(i) = 1#
+                    dof(i * 6) = 1
+                    dof(i * 6 + 1) = 1
+                    dof(i * 6 + 2) = 1
+                    dof(i * 6 + 3) = 0
+                    dof(i * 6 + 4) = 0
+                    dof(i * 6 + 5) = 0
+                Next
 
-				rc = srf.NormalAtXYZ(1, midXYZ, normal)
-				normal(0) = normal(0) * area
-				normal(1) = normal(1) * area
-				normal(2) = normal(2) * area
+                refNodeID = nd.NextEmptyID()
+                nd.x = midXYZ(0)
+                nd.y = midXYZ(1)
+                nd.z = midXYZ(2)
+                rc = nd.Put(refNodeID)
+                If rc <> C_FE_OK Then GoTo NextSurface
 
-				eID = rb3.NextEmptyID()
-				rb3.type = 29 'Rigid
-				rb3.topology = 13 'Rigid
-				rb3.Node(0) = ndID 'Independent Node
-				rb3.RigidInterpolate = True 'Interpolation element
-				rb3.release(0, 0) = 1
-				rb3.release(0, 1) = 1
-				rb3.release(0, 2) = 1
-				rc = rb3.PutNodeList(0, numpoints, nds, Null, weight, DOF )
-				rc = rb3.Put(eID)
+                rc = srf.NormalAtXYZ(1, midXYZ, normal)
+                If rc <> C_FE_OK Then GoTo NextSurface
+                nlen = Sqr(normal(0) * normal(0) + normal(1) * normal(1) + normal(2) * normal(2))
+                If nlen <= 0# Then GoTo NextSurface
+                fx = area * normal(0) / nlen
+                fy = area * normal(1) / nlen
+                fz = area * normal(2) / nlen
 
-				Ld.setID = LdSetID
-				Ld.ID = Ld.NextEmptyID()
-				Ld.type = 1
-				Ld.meshID = ndID
-				Ld.load(0) = normal(0)
-				Ld.load(1) = normal(1)
-				Ld.load(2) = normal(2)
-				Ld.XOn = True
-				Ld.YOn = True
-				Ld.ZOn = True
-				rc = Ld.Put(Ld.ID)
+                elemID = rb3.NextEmptyID()
+                rb3.ID = elemID
+                rb3.type = C_FET_RIGID
+                rb3.topology = C_FTO_RIGID
+                rb3.RigidInterpolate = True
+                rb3.color = C_RBE3_COLOR
+                rb3.Node(0) = refNodeID
+                rb3.release(0, 0) = 1
+                rb3.release(0, 1) = 1
+                rb3.release(0, 2) = 1
+                rc = rb3.PutNodeList(0, numpoints, nds, face, weight, dof)
+                If rc = C_FE_OK Then rc = rb3.Put(elemID)
+                If rc <> C_FE_OK Then GoTo NextSurface
 
-				srfID = srfset.Next()
-			Loop
-		End If
-	End If
+                ld.setID = loadSetID
+                loadID = ld.NextEmptyID()
+                ld.ID = loadID
+                ld.type = C_LOAD_FORCE
+                ld.meshID = refNodeID
+                ld.load(0) = fx
+                ld.load(1) = fy
+                ld.load(2) = fz
+                ld.XOn = True
+                ld.YOn = True
+                ld.ZOn = True
+                rc = ld.Put(loadID)
+            End If
+        End If
+NextSurface:
+        srfID = srfset.Next()
+    Loop
 
-	'pts = srf.PointsAsSet(FCC_BOTH)
-	'crvs = srf.CurvesAsSet(FCC_OFF)
-	'midnode = srf.cg
+    GoTo ExitHere
 
-    
+ErrorHandler:
+    MsgBox "Error " & CStr(Err.Number) & ": " & Err.Description
+
+ExitHere:
+    Set ld = Nothing
+    Set ldset = Nothing
+    Set rb3 = Nothing
+    Set nd = Nothing
+    Set pt = Nothing
+    Set srf = Nothing
+    Set srfset = Nothing
+    Set App = Nothing
 End Sub

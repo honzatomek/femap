@@ -1,32 +1,53 @@
-'Renumbers RBE Elements with the number of Independent node
+' =============================================================================
+' Description: Renumbers rigid elements using their reference/master node IDs.
+' Compatibility: Nastran for Windows 2004 and modern FEMAP.
+' =============================================================================
+
+Option Explicit
+
+' Renumbers rigid elements to the ID of their reference node.
+' Uses legacy feRenumberOpt for N4W 2004 compatibility.
+
+Const C_FE_OK As Long = -1
+Const C_FT_ELEM As Long = 8
+Const C_FET_RIGID As Long = 29
+Const C_FTO_RIGID As Long = 13
 
 Sub Main
-    Dim App As femap.model
-    Set App = feFemap()
+    Dim App As Object
+    Set App = feGetObject()
+
     Dim el As Object
-    Set el = App.feElem()
     Dim eset As Object
-    Set eset = App.feSet()
     Dim eID As Long
-    Dim ndID As Long
-    Dim i As Long
-    Dim ecount As Long
+    Dim nID As Long
+    Dim rc As Long
 
-    rc = eset.Select( 8, True, "Select Rigid Elements to be renumbered by master node")
-    If rc <> - 1 Then Exit Sub
-	ecount = eset.Count()
-	rc = eset.Reset()
+    Set el = App.feElem()
+    Set eset = App.feSet()
 
-	For i = 0 To ecount - 1
-		eID = eset.Next()
-		rc = el.Get(eID)
-		If (el.type = 29) And (el.topology = 13) Then
-			nID = el.Node(0)
-			rc = App.feRenumberOpt2(FT_ELEM, -eID, nID, 0, 0, False, False, False, 0)
-		End If
-	Next
+    On Error GoTo ErrorHandler
 
-    Set el = Nothing
+    rc = eset.Select(C_FT_ELEM, True, "Select rigid elements to renumber by reference-node ID:")
+    If rc <> C_FE_OK Then GoTo ExitHere
+
+    rc = eset.Reset()
+    eID = eset.Next()
+    Do While eID <> 0
+        rc = el.Get(eID)
+        If (rc = C_FE_OK) And (el.type = C_FET_RIGID) And (el.topology = C_FTO_RIGID) Then
+            nID = el.Node(0)
+            rc = App.feRenumberOpt(C_FT_ELEM, -eID, nID, 0, 0, False, False, False)
+        End If
+        eID = eset.Next()
+    Loop
+    GoTo ExitHere
+
+ErrorHandler:
+    MsgBox "Error " & CStr(Err.Number) & ": " & Err.Description
+
+ExitHere:
     Set eset = Nothing
+    Set el = Nothing
     Set App = Nothing
 End Sub

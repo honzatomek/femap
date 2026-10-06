@@ -1,23 +1,41 @@
-Option Explicit On
+' =============================================================================
+' Description: Controls visibility of multiple FEMAP groups in the active view.
+' Compatibility: Modern FEMAP only; the script shows an early compatibility message on N4W 2004.
+' =============================================================================
+
+Option Explicit
 
 Const DBUG As Boolean = False
+Const C_FE_OK As Long = -1
+Const C_FE_NO_MEMORY As Long = 10
+Const C_FT_GROUP As Long = 24
+Const C_FCM_NORMAL As Long = 0
 Private er As Long
 Private groupStates() As Long
 Private groupStatesOrg() As Long
 
 Sub Main
-    Dim App As femap.model
-    Set App = feFemap()
+    Dim App As Object
+    Set App = feGetObject()
     Dim rc As Long, i As Long
 
     er = 0
 
-    If Not DBUG Then On Error GoTo Cleanup
+    If App.Info_Version < 10# Then
+        MsgBox "Groups_Visibility requires the modern FEMAP multi-group View API and is not portable to Nastran for Windows 2004."
+        GoTo Cleanup
+    End If
 
 	Dim v As Object
 	Set v = App.feView
-
 	rc = v.Get(1)
+
+	If Not SupportsMultiGroupView(v) Then
+		MsgBox "Groups_Visibility requires the modern FEMAP multi-group View API and is not portable to Nastran for Windows 2004."
+		GoTo Cleanup
+	End If
+
+    If Not DBUG Then On Error GoTo Cleanup
 
 	Dim nGroups As Long
 	Dim nGroupID As Variant
@@ -29,15 +47,15 @@ Sub Main
 	er = 1
 
 	rc = v.GetMultiGroupList(nGroups, nGroupID)
-	If (rc = FE_NO_MEMORY) Then
+	If (rc = C_FE_NO_MEMORY) Then
 		er = -1
 		GoTo Cleanup
 	End If
 
 	er = 2
 
-	rc =gset.AddAll(FT_GROUP)
-	If rc <> -1 Then
+	rc =gset.AddAll(C_FT_GROUP)
+	If rc <> C_FE_OK Then
 		er = -2
 		GoTo Cleanup
 	End If
@@ -49,24 +67,25 @@ Sub Main
 	For i = 0 To nGroups - 1 Step 1
 		rc = g.Get(Abs(nGroupID(i)))
 		groupStates(g.ID) = nGroupID(i) / Abs(nGroupID(i))
-		If rc <> -1 Then
-			If DBUG Then Debug.Print("Group ID - "  & g.ID() & vbTab &  "Does Not Exist")
+		If rc <> C_FE_OK Then
+			If DBUG Then Debug.Print "Group ID - " & g.ID() & vbTab & "Does Not Exist"
 			er = -3
 			'GoTo Cleanup
 		Else
-				If DBUG Then Debug.Print("Group ID - "  & g.ID() & vbTab &  "Group Name - " & g.title() & vbTab & "State: " & nGroupID(i)/Abs(nGroupID(i)))
+				If DBUG Then Debug.Print "Group ID - " & g.ID() & vbTab & "Group Name - " & g.title() & vbTab & "State: " & nGroupID(i)/Abs(nGroupID(i))
 		End If
 	Next
 
-	groupStatesOrg = groupStates
+	ReDim groupStatesOrg(LBound(groupStates) To UBound(groupStates))
+	Call CopyLongArray(groupStates, groupStatesOrg)
 
 	er = 4
 
 	If DBUG Then
 		For i = LBound(groupStates) To UBound(groupStates)
 			rc = g.Get(i)
-			If rc = -1 Then
-				Debug.Print("Group ID - "  & i & vbTab &  "Group Name - " & g.title() & vbTab & "State: " & groupStates(i))
+			If rc = C_FE_OK Then
+				Debug.Print "Group ID - " & i & vbTab & "Group Name - " & g.title() & vbTab & "State: " & groupStates(i)
 			End If
 		Next
 	End If
@@ -94,19 +113,41 @@ Sub Main
 	End Dialog
 	Dim dlg As UserDialog
 	If Dialog(dlg) <> -1 Then
-		groupStates = groupStatesOrg
+		Call CopyLongArray(groupStatesOrg, groupStates)
 	End If
 
 	Call Preview(groupStates)
 
 	er = 0
 Cleanup:
-	If Not DBUG Then Call App.feAppMessage(FCM_NORMAL, "The script exited with code: " & er)
+	If Not DBUG Then Call App.feAppMessage(C_FCM_NORMAL, "The script exited with code: " & er)
 	On Error Resume Next
 	Set v = Nothing
 	Set gset = Nothing
 	Set g = Nothing
 	Set App = Nothing
+End Sub
+
+Private Function SupportsMultiGroupView(ByRef v As Object) As Boolean
+	Dim nGroups As Long
+	Dim ids As Variant
+	Dim rc As Long
+	On Error Resume Next
+	Err.Clear
+	rc = v.GetMultiGroupList(nGroups, ids)
+	If Err.Number = 0 Then
+		SupportsMultiGroupView = True
+	Else
+		SupportsMultiGroupView = False
+	End If
+	Err.Clear
+End Function
+
+Private Sub CopyLongArray(ByRef src() As Long, ByRef dst() As Long)
+	Dim i As Long
+	For i = LBound(src) To UBound(src)
+		dst(i) = src(i)
+	Next
 End Sub
 
 Rem See DialogFunc help topic for more information.
@@ -286,9 +327,9 @@ Private Function CountValues(ByRef arr() As Long) As Long
 	CountValues = c
 End Function
 
-Private Function SelectVisibility(ByRef arr() As Long, Optional ByVal state As Long = 1) As Long
-	Dim App As femap.model
-	Set App = feFemap()
+Private Function SelectVisibility(ByRef arr() As Long, ByVal state As Long) As Long
+	Dim App As Object
+	Set App = feGetObject()
 	Dim rc As Long, i As Long, erval As Long
 
 	Dim txt(-1 To 1) As String
@@ -306,8 +347,8 @@ Private Function SelectVisibility(ByRef arr() As Long, Optional ByVal state As L
 	Dim g As Object
 	Set g = App.feGroup()
 
-	'rc = gset.Select(FT_GROUP, True, txt(state))
-	rc = gset.SelectMultiID(FT_GROUP, 1, txt(state))
+	'Portable single/multiple group selection uses Set.Select
+	rc = gset.Select(C_FT_GROUP, True, txt(state))
 	If (rc <> -1) Or (gset.Count() < 1) Then
 		erval = -2
 		GoTo Cleanup
@@ -318,7 +359,7 @@ Private Function SelectVisibility(ByRef arr() As Long, Optional ByVal state As L
 	rc = gset.Reset()
 	For i = 0 To gset.Count() - 1 Step 1
 		rc = g.Get(gset.Next())
-		If rc = -1 Then
+		If rc = C_FE_OK Then
 			arr(g.ID) = state
 		Else
 			erval = i
@@ -339,8 +380,8 @@ On Error Resume Next
 End Function
 
 Private Sub Redraw()
-	Dim App As femap.model
-	Set App = feFemap()
+	Dim App As Object
+	Set App = feGetObject()
 
 	Call App.feViewRegenerate(1)
 	Call App.feViewRedraw(1)
@@ -350,8 +391,8 @@ On Error Resume Next
 End Sub
 
 Private Sub Preview(ByRef arr() As Long)
-	Dim App As femap.model
-	Set App = feFemap()
+	Dim App As Object
+	Set App = feGetObject()
 	Dim rc As Long
 	Dim i As Long, j As Long
 

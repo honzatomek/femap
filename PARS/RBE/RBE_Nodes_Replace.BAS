@@ -1,90 +1,82 @@
+' =============================================================================
+' Description: Replaces selected nodes in rigid-element node lists.
+' Compatibility: Nastran for Windows 2004 and modern FEMAP.
+' =============================================================================
+
 Option Explicit
 
-'Script to replace rigid spider nodes
-Const DBUG As Boolean = False
-Private StartTime As Double
+' Replaces one listed node in an RBE2/RBE3 rigid element.
+' Written against the common N4W 2004 / modern FEMAP BASIC/API subset.
+
+Const C_FE_OK As Long = -1
+Const C_FT_NODE As Long = 7
+Const C_FT_ELEM As Long = 8
+Const C_FET_RIGID As Long = 29
+Const C_FTO_RIGID As Long = 13
+Const C_FCM_NORMAL As Long = 0
 
 Sub Main
-    Dim App As femap.model
-    Set App = feFemap()
-    Dim rc As Long, i As Long
-
-    If DBUG Then
-    	On Error GoTo 0
-    Else
-    	On Error GoTo ExitHere
-    End If
-
-    StartTime = Timer
+    Dim App As Object
+    Set App = feGetObject()
 
     Dim el As Object
-    Set el = App.feElem
+    Dim epick As Object
+    Dim npick As Object
     Dim elID As Long
-
-    Dim s As Object
-    Set s = App.feSet()
-    Dim ns As Object
-    Set ns = App.feSet()
-
-    Dim ndold As Long
-    Dim ndnew As Long
-
+    Dim oldNode As Long
+    Dim newNode As Long
+    Dim rc As Long
+    Dim i As Long
+    Dim found As Boolean
     Dim ndcount As Long
     Dim nds As Variant
     Dim face As Variant
     Dim weight As Variant
-    Dim DOF As Variant
+    Dim dof As Variant
 
-    Dim c As Long
-    c = 0
+    Set el = App.feElem()
+    Set epick = App.feSet()
+    Set npick = App.feSet()
 
-    Do While s.SelectID(8, "Select RBE2/RBE3 Element for nodes Update:", elID) = -1
-		rc = ns.Clear()
-    	rc = el.Get(elID)
-		pt("Selected element: " & elID & ", type = " & el.type & ", topology = " & el.topology, c + 1)
-		If (el.type = 29) And (el.topology = 13) Then
-			c = c + 1
-			rc = el.GetNodeList(0, ndcount, nds, face, weight, DOF)
-			Do
-				rc = ns.SelectID(7, "Select Node to be Replaced:", ndold)
-				If rc <> -1 Then GoTo ExitHere
-				For i = 0 To (ndcount - 1) Step 1
-					If nds(i) = ndold Then Exit Do
-				Next
-			Loop
+    On Error GoTo ErrorHandler
 
-			rc = ns.SelectID(7, "Select new node:", ndnew)
-			If rc <> -1 Then GoTo ExitHere
-			nds(i) = ndnew
-			rc = el.PutNodeList(0, ndcount, nds, face, weight, DOF)
-			rc = el.Put(elID)
-			If rc = -1 Then pt("Updated element " & elID & " by changing node " & ndold & " to node " & ndnew & ".", c)
-			feFemap.feViewRegenerate(1)
-		End If
+    Do While epick.SelectID(C_FT_ELEM, "Select RBE2/RBE3 element for node update:", elID) = C_FE_OK
+        rc = el.Get(elID)
+        If (rc = C_FE_OK) And (el.type = C_FET_RIGID) And (el.topology = C_FTO_RIGID) Then
+            rc = el.GetNodeList(0, ndcount, nds, face, weight, dof)
+            If rc = C_FE_OK Then
+                found = False
+                Do While Not found
+                    rc = npick.SelectID(C_FT_NODE, "Select listed node to replace:", oldNode)
+                    If rc <> C_FE_OK Then GoTo ExitHere
+                    For i = 0 To ndcount - 1
+                        If nds(i) = oldNode Then
+                            found = True
+                            Exit For
+                        End If
+                    Next
+                    If Not found Then MsgBox "Node " & CStr(oldNode) & " is not a listed node of rigid element " & CStr(elID) & "."
+                Loop
+
+                rc = npick.SelectID(C_FT_NODE, "Select replacement node:", newNode)
+                If rc <> C_FE_OK Then GoTo ExitHere
+                nds(i) = newNode
+                rc = el.PutNodeList(0, ndcount, nds, face, weight, dof)
+                If rc = C_FE_OK Then rc = el.Put(elID)
+                If rc = C_FE_OK Then Call App.feAppMessage(C_FCM_NORMAL, "Updated rigid element " & CStr(elID) & ": node " & CStr(oldNode) & " -> " & CStr(newNode) & ".")
+                Call App.feViewRegenerate(1)
+            End If
+        End If
     Loop
 
-    If c > 0 Then Call feFemap.feViewShow(8, s.ID)
+    GoTo ExitHere
+
+ErrorHandler:
+    MsgBox "Error " & CStr(Err.Number) & ": " & Err.Description
 
 ExitHere:
-	On Error Resume Next
-		Set el = Nothing
-		Set ns = Nothing
-		Set s = Nothing
-		Set App = Nothing
+    Set npick = Nothing
+    Set epick = Nothing
+    Set el = Nothing
+    Set App = Nothing
 End Sub
-
-Private Sub pt(ByVal message As String, Optional ByVal i As Long = 0, Optional ByVal debugging As Boolean = False)
-	'Dim App As femap.model
-	'Set App = feFemap
-	Dim rc As Long
-
-	If DBUG Then Debug.Print "["& i & "] - " & MinutesElapsed & " - " & message
-	If (Not debugging) Then	rc = feFemap.feAppMessage(FCM_NORMAL, "["& i & "] - " & MinutesElapsed & " - " & message)
-
-	'Set App = Nothing
-End Sub
-
-Private Function MinutesElapsed(Optional ByVal t As Double = 0) As String
-	If t = 0 Then t = StartTime
-	MinutesElapsed = Format((Timer - t) / 86400, "hh:mm:ss")
-End Function

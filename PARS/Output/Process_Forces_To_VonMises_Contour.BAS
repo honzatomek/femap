@@ -1,11 +1,23 @@
-Attribute VB_Name = "Module1"
+' =============================================================================
+' Description: Calculates a beam von Mises contour result from force-result components using the modern BeamCalculator API.
+' Compatibility: Modern FEMAP only; the script shows an early compatibility message on N4W 2004.
+' =============================================================================
+
 Option Explicit
+
+Const C_FE_FAIL As Long = 0
+Const C_FE_CANCEL As Long = 2
+Const C_FT_OUT_CASE As Long = 28
+Const C_FT_OUT_DIR As Long = 29
+Const C_FCM_NORMAL As Long = 0
 
 'Will create a vector for  Von Mises Stress along beams
 
 Sub Main
-	Dim App As femap.model
-	Set App = feFemap()
+	Dim App As Object
+	Set App = feGetObject()
+
+    If Not RequireModernFemap(App, "Requires the BeamCalculator API (added in FEMAP 11.1.1).") Then GoTo CompatibilityExit
 	Dim rc As Long
 
 	On Error GoTo ExitHere
@@ -93,11 +105,11 @@ Sub Main
 	Call App.feAppStatusShow(True, outputs * elements)
 
 	rc = osset.Reset()
-	Do While osset.Next() <> FE_FAIL
+	Do While osset.Next() <> C_FE_FAIL
 		oput = oput + 1
 
 		rc = os.Get(osset.CurrentID())
-		Call App.feAppMessage(FCM_NORMAL, "Processing VonMises Stress on Output ID " & os.ID & " - " & os.title)
+		Call App.feAppMessage(C_FCM_NORMAL, "Processing VonMises Stress on Output ID " & os.ID & " - " & os.title)
 		j = -1
 		rc = elset.Reset()
 
@@ -105,7 +117,7 @@ Sub Main
 		Call ReturnVecIDs(os.ID, ovIDB, "B")
 		elmnt = 0
 
-		Do While elset.Next() <> FE_FAIL
+		Do While elset.Next() <> C_FE_FAIL
 			elmnt = elmnt + 1
 			j = j + 1
 			elID = elset.CurrentID()
@@ -176,11 +188,17 @@ ExitHere:
 	Set osset = Nothing
 	Set App = Nothing
 	On Error GoTo 0
+
+CompatibilityExit:
+    On Error Resume Next
+    Set App = Nothing
+    Exit Sub
+
 End Sub
 
 Private Sub ReturnVecIDs(ByVal OutSet As Long, ByRef ovIDs() As Long, ByVal e As String)
-	Dim App As femap.model
-	Set App = feFemap
+	Dim App As Object
+	Set App = feGetObject()
 	Dim rc As Long, i As Long
 	Dim o As Object
 	Set o = App.feOutput()
@@ -200,7 +218,7 @@ Private Sub ReturnVecIDs(ByVal OutSet As Long, ByRef ovIDs() As Long, ByVal e As
 		rc = o.Reset()
 		s = "Beam End" & e & " " & arrs(i)
 		ovIDs(i) = 0
-		Do While o.Next() <> FE_FAIL
+		Do While o.Next() <> C_FE_FAIL
 			If InStr(1, o.title, s) <> 0 Then
 				ovIDs(i) = o.ID
 				Exit Do
@@ -215,8 +233,8 @@ Private Sub ReturnVecIDs(ByVal OutSet As Long, ByRef ovIDs() As Long, ByVal e As
 End Sub
 
 Private Function VonMisesOutputVector(ByVal OutSet As Long) As Long
-	Dim App As femap.model
-	Set App = feFemap
+	Dim App As Object
+	Set App = feGetObject()
 	Dim rc As Long, i As Long
 	Dim o As Object
 	Set o = App.feOutput()
@@ -227,7 +245,7 @@ Private Function VonMisesOutputVector(ByVal OutSet As Long) As Long
 	o.setID = OutSet
 	rc = o.Reset()
 	s = "End A Max VonMises Stress"
-	Do While o.Next() <> FE_FAIL
+	Do While o.Next() <> C_FE_FAIL
 		If InStr(1, o.title, s) <> 0 Then
 			tmp = o.ID()
 			Exit Do
@@ -242,4 +260,16 @@ Private Function VonMisesOutputVector(ByVal OutSet As Long) As Long
 	Set o = Nothing
 	Set App = Nothing
 	On Error GoTo 0
+End Function
+
+
+Function RequireModernFemap(ByRef App As Object, ByVal featureText As String) As Boolean
+    RequireModernFemap = False
+
+    If App.Info_Version < 11.1 Then
+        MsgBox "This script is not portable to Nastran for Windows 2004." & Chr(13) & Chr(10) & featureText
+        Exit Function
+    End If
+
+    RequireModernFemap = True
 End Function

@@ -1,47 +1,58 @@
-Attribute VB_Name = "Module1"
+' =============================================================================
+' Description: Updates the rigid thermal-expansion coefficient for selected RBE2 elements.
+' Compatibility: Nastran for Windows 2004 and modern FEMAP.
+' =============================================================================
+
 Option Explicit
 
-Sub Main
-	Dim App As femap.model
-    Set App = feFemap()
-    Dim rc As Long
+' Updates the rigid-element thermal expansion coefficient on selected RBE2 elements.
+' RigidThermalExpansion is part of the legacy rigid-element API.
 
-    On Error GoTo ExitHere
+Const C_FE_OK As Long = -1
+Const C_FT_ELEM As Long = 8
+Const C_FET_RIGID As Long = 29
+Const C_FTO_RIGID As Long = 13
+
+Sub Main
+    Dim App As Object
+    Set App = feGetObject()
 
     Dim elset As Object
-    Set elset = App.feSet()
     Dim el As Object
-    Set el = App.feElem()
     Dim elID As Long
-    Dim tmp As Variant
+    Dim rc As Long
+    Dim s As String
     Dim thexp As Double
 
-	rc = elset.Select(8, True, "Select Rigid elements (RBE2)")
-	If rc <> -1 Then GoTo ExitHere
-	rc = elset.Reset()
+    Set elset = App.feSet()
+    Set el = App.feElem()
 
-	tmp = InputBox("Input new Thermal Expansion Coefficient", "RBE2 Thermal Update", "1.2e-05")
-	If tmp = "" Then GoTo ExitHere
+    On Error GoTo ErrorHandler
 
-	If InStr(1, tmp, ".") <> 0 Then tmp = Replace(tmp, ".", ",")
-	thexp = CDbl(tmp)
+    rc = elset.Select(C_FT_ELEM, True, "Select RBE2 elements:")
+    If rc <> C_FE_OK Then GoTo ExitHere
 
-	elID = elset.Next()
+    s = InputBox("Input new Thermal Expansion Coefficient", "RBE2 Thermal Update", "1.2e-05")
+    If s = "" Then GoTo ExitHere
+    thexp = Val(s)
 
-	Do While elID <> 0
-		rc = el.Get(elID)
-		If (el.type = 29) And (el.topology = 13) Then 'And (Not el.RigidInterpolate)
-			'Debug.Print el.ID
-			el.RigidThermalExpansion = thexp
-			rc = el.Put(el.ID)
-		End If
+    rc = elset.Reset()
+    elID = elset.Next()
+    Do While elID <> 0
+        rc = el.Get(elID)
+        If (rc = C_FE_OK) And (el.type = C_FET_RIGID) And (el.topology = C_FTO_RIGID) And (Not el.RigidInterpolate) Then
+            el.RigidThermalExpansion = thexp
+            rc = el.Put(el.ID)
+        End If
+        elID = elset.Next()
+    Loop
+    GoTo ExitHere
 
-		elID = elset.Next()
-	Loop
+ErrorHandler:
+    MsgBox "Error " & CStr(Err.Number) & ": " & Err.Description
 
 ExitHere:
-	On Error Resume Next
-	Set el = Nothing
-	Set elset = Nothing
-	Set App = Nothing
+    Set el = Nothing
+    Set elset = Nothing
+    Set App = Nothing
 End Sub

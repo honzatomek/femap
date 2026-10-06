@@ -1,4 +1,15 @@
+' =============================================================================
+' Description: Processes selected result combinations and envelopes through a GUI using modern FEMAP output APIs.
+' Compatibility: Modern FEMAP only; the script shows an early compatibility message on N4W 2004.
+' =============================================================================
+
 Option Explicit
+
+Const C_FE_FAIL As Long = 0
+Const C_FE_CANCEL As Long = 2
+Const C_FT_OUT_CASE As Long = 28
+Const C_FT_OUT_DIR As Long = 29
+Const C_FCM_NORMAL As Long = 0
 
 Private ovects As Object
 Private allvect As Boolean
@@ -17,8 +28,10 @@ Private txt As String
 Private sti As Boolean
 
 Sub Main
-    Dim App As femap.model
-    Set App = feFemap()
+    Dim App As Object
+    Set App = feGetObject()
+
+    If Not RequireModernFemap(App, "Requires post-2004 output combination/envelope APIs.") Then GoTo CompatibilityExit
     Dim rc As Long
     Dim i As Long
 	Dim nm As String
@@ -49,7 +62,7 @@ Sub Main
 
 	On Error GoTo ExitHere
 
-    ReDim CombsArray(0) As String
+    ReDim CombsArray(0)
     'ReDim osets(0)
     ReDim fact(0)
     fact(0) = 0.0
@@ -80,12 +93,11 @@ Sub Main
 	dlg.SetI = 0
 	dlg.StartWith1 = CStr(st)
 	dlg.name = txt
-	rc = Dialog(dlg)
-	If rc = 0 Then GoTo ExitHere
+	If Dialog(dlg) = 0 Then GoTo ExitHere
 	If CombsArray(0) = "Click Add to Start" Then GoTo ExitHere
 
 	Set ovects = App.feSet()
-	rc = ovects.SelectMultiID(FT_OUT_DIR, osets(0).First(), "Select Output Vectors to combine:")
+	rc = ovects.SelectMultiID(C_FT_OUT_DIR, osets(0).First(), "Select Output Vectors to combine:")
     If ovects.Count() = 0 Then
     	allvect = True
     End If
@@ -93,7 +105,11 @@ Sub Main
     suppress = App.DialogAutoSkipMsg
 	App.DialogAutoSkipMsg = 1
 
-    nm = Join(CombsArray, " + ")
+    nm = ""
+    For i = 0 To UBound(CombsArray)
+        If i > 0 Then nm = nm & " + "
+        nm = nm & CombsArray(i)
+    Next
     multi = 1
 
     For i = 0 To UBound(fact) - (st - 1) Step 1
@@ -139,7 +155,7 @@ Sub Main
 		oset.notes = env(i) & "Envelope from Output Sets via femap API" & Chr(13) & Chr(10)  & env(i) & nm
 		rc = envset.Add(osID)
 		rc = oset.Put(osID)
-		rc =App.feAppMessage(FCM_NORMAL, MinutesElapsed(StartTime) & " - " & txt & env(i) & nm)
+		rc =App.feAppMessage(C_FCM_NORMAL, MinutesElapsed(StartTime) & " - " & txt & env(i) & nm)
 		Call App.feAppUnlock()
 	Next
 
@@ -147,12 +163,12 @@ Sub Main
 
 	If clean Then
 		rc = App.feDelete(28, todel.ID)'
-		rc = App.feRenumberOpt2(FT_OUT_CASE, envset.ID, 1, 0, 0, False, False, False, 0)
+		rc = App.feRenumberOpt2(C_FT_OUT_CASE, envset.ID, 1, 0, 0, False, False, False, 0)
 	End If
 
 	App.DialogAutoSkipMsg = suppress
 
-	rc = App.feAppMessage(FCM_NORMAL, "Script Lasted: " & MinutesElapsed(StartTime))
+	rc = App.feAppMessage(C_FCM_NORMAL, "Script Lasted: " & MinutesElapsed(StartTime))
 
 ExitHere:
 	On Error Resume Next
@@ -166,6 +182,12 @@ ExitHere:
 	Next
 	Set ovects = Nothing
 	Set App = Nothing
+
+CompatibilityExit:
+    On Error Resume Next
+    Set App = Nothing
+    Exit Sub
+
 End Sub
 
 Rem See DialogFunc help topic for more information.
@@ -229,8 +251,8 @@ Private Function combinations(DlgItem$, Action%, SuppValue?) As Boolean
 End Function
 
 Private Sub ChangeGroup()
-	Dim App As femap.model
-    Set App = feFemap()
+	Dim App As Object
+    Set App = feGetObject()
     Dim oset As Object
     Set oset = App.feSet()
     Dim rc As Long
@@ -307,8 +329,8 @@ End Sub
 
 
 Private Function AddCombinationGroup() As Boolean
-	Dim App As femap.model
-    Set App = feFemap()
+	Dim App As Object
+    Set App = feGetObject()
     Dim rc As Long
 	Dim ub As Long
 	Dim tmp As String
@@ -365,7 +387,7 @@ Private Function AddCombinationGroup() As Boolean
 	Set App = Nothing
 End Function
 
-Private Sub RemoveCombinationGroup(Optional ByVal index As Long = -1)
+Private Sub RemoveCombinationGroup(ByVal index As Long)
 	Dim i As Long
 	Dim rc As Long
 	If fact(0) = 0.0 Then Exit Sub
@@ -410,8 +432,8 @@ End Sub
 
 
 Private Sub MakeEnvelopes(ByRef s As Object, ByRef cmbs As Object, ByVal index As Long)
-	Dim App As femap.model
-    Set App = feFemap()
+	Dim App As Object
+    Set App = feGetObject()
     Dim rc As Long
     Dim eset As Object
     Set eset = App.feSet()
@@ -432,7 +454,7 @@ Private Sub MakeEnvelopes(ByRef s As Object, ByRef cmbs As Object, ByVal index A
 		rc = eset.Add(osID)
 		rc = oset.Put(osID)
 
-		rc =App.feAppMessage(FCM_NORMAL, MinutesElapsed(StartTime) & " - " & env(i) & CombsArray(index))
+		rc =App.feAppMessage(C_FCM_NORMAL, MinutesElapsed(StartTime) & " - " & env(i) & CombsArray(index))
 	Next
 
 	rc = s.Clear()
@@ -446,9 +468,9 @@ ExitHere:
 	Set App = Nothing
 End Sub
 
-Private Sub Combine(ByVal index As Long, ByRef cmbs As Object, Optional ByVal level As Long = 1, Optional ByVal av As Boolean = True)
-	Dim App As femap.model
-	Set App = feFemap()
+Private Sub Combine(ByVal index As Long, ByRef cmbs As Object, ByVal level As Long, ByVal av As Boolean)
+	Dim App As Object
+	Set App = feGetObject()
 	Dim oset As Object
 	Set oset = App.feOutputSet()
 	Dim rc As Long
@@ -512,7 +534,7 @@ Private Sub Combine(ByVal index As Long, ByRef cmbs As Object, Optional ByVal le
 		oset.title = tmp
 		oset.notes = tmp
 		rc = oset.Put(osID)
-		rc =App.feAppMessage(FCM_NORMAL, MinutesElapsed(StartTime) & " - " & tmp)
+		rc =App.feAppMessage(C_FCM_NORMAL, MinutesElapsed(StartTime) & " - " & tmp)
 		rc = cmbs.Add(osID)
 		If ldgrp Then
 			For j = 0 To (st - 2) Step 1
@@ -532,7 +554,7 @@ Private Sub Combine(ByVal index As Long, ByRef cmbs As Object, Optional ByVal le
 			oset.title = tmp
 			oset.notes = tmp
 			rc = oset.Put(osID)
-			rc =App.feAppMessage(FCM_NORMAL, MinutesElapsed(StartTime) & " - " & tmp)
+			rc =App.feAppMessage(C_FCM_NORMAL, MinutesElapsed(StartTime) & " - " & tmp)
 			rc = cmbs.Add(osID)
 		End If
 		com = com + 1
@@ -544,7 +566,7 @@ Private Sub Combine(ByVal index As Long, ByRef cmbs As Object, Optional ByVal le
 	Set App = Nothing
 End Sub
 
-Private Sub CreateCombination(ByRef App As Variant, ByRef oset As Object, ByRef cmbs As Object, ByRef OutSet() As Long, ByRef OutFact() As Double, ByRef OutVect() As Long, Optional ByVal av As Boolean = True)
+Private Sub CreateCombination(ByRef App As Variant, ByRef oset As Object, ByRef cmbs As Object, ByRef OutSet() As Long, ByRef OutFact() As Double, ByRef OutVect() As Long, ByVal av As Boolean)
 	Dim osID As Long
 	Dim rc As Long
 	Dim i As Long, j As Long
@@ -571,7 +593,7 @@ Private Sub CreateCombination(ByRef App As Variant, ByRef oset As Object, ByRef 
 	End If
 End Sub
 
-Function print_nCr(ByVal n As Integer, ByVal r As Integer, ByRef p() As Variant, Optional ByVal start As Long = 1)
+Function print_nCr(ByVal n As Integer, ByVal r As Integer, ByRef p() As Variant, ByVal start As Long)
   c = 1
   Dim tmp() As Long
   ReDim tmp(pick - 1)
@@ -581,7 +603,7 @@ Function print_nCr(ByVal n As Integer, ByVal r As Integer, ByRef p() As Variant,
 End Function
 
 
-Private Function internal_print_nCr(n As Integer, r As Integer, ByRef p() As Variant, Optional i As Integer, Optional l As Integer) As Integer
+Private Function internal_print_nCr(n As Integer, r As Integer, ByRef p() As Variant, i As Integer, l As Integer) As Integer
 
   ' n is the number of items we are choosing from
   ' r is the number of items to choose
@@ -652,3 +674,15 @@ Private Function NumCombinations(ByVal n As Long, ByVal k As Long) As Long
 	End If
 End Function
 
+
+
+Function RequireModernFemap(ByRef App As Object, ByVal featureText As String) As Boolean
+    RequireModernFemap = False
+
+    If App.Info_Version < 10# Then
+        MsgBox "This script is not portable to Nastran for Windows 2004." & Chr(13) & Chr(10) & featureText
+        Exit Function
+    End If
+
+    RequireModernFemap = True
+End Function

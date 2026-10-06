@@ -1,11 +1,20 @@
-Option Explicit On
+' =============================================================================
+' Description: Creates a FEMAP group from entities selected by an output-result criterion.
+' Compatibility: Nastran for Windows 2004 and modern FEMAP.
+' =============================================================================
+
+Option Explicit
 
 Const DBUG As Boolean = True
+Const C_FE_OK As Long = -1
+Const C_FT_OUT_CASE As Long = 28
+Const C_FT_OUT_DIR As Long = 29
+Const C_FCM_NORMAL As Long = 0
 Private er As Long
 
 Sub Main
-    Dim App As femap.model
-    Set App = feFemap()
+    Dim App As Object
+    Set App = feGetObject()
     Dim rc As Long, i As Long
 
     er = 0
@@ -30,10 +39,10 @@ Sub Main
     Set ovecs = App.feSet()
 
 '1
-    rc = osets.AddAll(FT_OUT_CASE)
+    rc = osets.AddAll(C_FT_OUT_CASE)
     If (rc <> -1) And (osets.Count() < 1) Then
     	er = 1
-		Call App.feAppMessage(FCM_NORMAL, "There are no Output Sets")
+		Call App.feAppMessage(C_FCM_NORMAL, "There are no Output Sets")
     	GoTo Cleanup
     End If
 
@@ -45,7 +54,13 @@ Sub Main
 	Next
 
 	rc = oset.Get(osets.First())
-	rc = oset.OutputVectors(ovecs.ID)
+	oset.Active = oset.ID
+	rc = ovecs.AddAll(C_FT_OUT_DIR)
+	If (rc <> C_FE_OK) Or (ovecs.Count() < 1) Then
+		er = 2
+		Call App.feAppMessage(C_FCM_NORMAL, "There are no Output Vectors in the selected Output Set")
+		GoTo Cleanup
+	End If
 
 	rc = ovecs.Reset()
 	ReDim vectitles(ovecs.Count() - 1)
@@ -101,12 +116,12 @@ Sub Main
 	dlg.Group1 = 0
 	dlg.Group2 = 0
 
-	rc = Dialog(dlg)
+	If Dialog(dlg) = 0 Then er = 1
 
 
 
 Cleanup:
-	Call App.feAppMessage(FCM_NORMAL, "The script exited with code: " & er)
+	Call App.feAppMessage(C_FCM_NORMAL, "The script exited with code: " & er)
 	On Error Resume Next
 	Set App = Nothing
 End Sub
@@ -114,15 +129,17 @@ End Sub
 
 Rem See DialogFunc help topic for more information.
 Private Function outputselect(DlgItem$, Action%, SuppValue?) As Boolean
+	outputselect = True
 	Select Case Action%
 	Case 1 ' Dialog box initialization
 		DlgEnable("oslistbox", False)
 	Case 2 ' Value changing or button pressed
 		Select Case DlgItem$
+		Case "OK", "Cancel", "Esc"
+			outputselect = False
 		Case "Group1"
 			DlgEnable("oslistbox", Not DlgEnable("oslistbox"))
 		End Select
-		Rem outputselect = True ' Prevent button press from closing the dialog box
 	Case 3 ' TextBox or ComboBox text changed
 	Case 4 ' Focus changed
 	Case 5 ' Idle

@@ -1,128 +1,126 @@
+' =============================================================================
+' Description: Creates an RBE3 from unique end nodes of selected beam elements.
+' Compatibility: Nastran for Windows 2004 and modern FEMAP.
+' =============================================================================
+
 Option Explicit
 
-'Creates RBE3 Element from Beam elements end-nodes
-Private er As Long
-Const DBUG As Boolean = True
+' Creates one RBE3 from the unique end nodes of selected BEAM elements.
+' The dependent/reference node is the arithmetic mean of the selected beam end nodes.
 
-Sub Main()
-	Dim App As femap.model
-	Set App = feFemap()
-	Dim rc As Long, i As Long, j As Long
+Const C_FE_OK As Long = -1
+Const C_FT_ELEM As Long = 8
+Const C_FET_BEAM As Long = 5
+Const C_FET_RIGID As Long = 29
+Const C_FTO_RIGID As Long = 13
+Const C_RBE3_COLOR As Long = 122
+Const C_FCM_NORMAL As Long = 0
 
-	On Error GoTo Cleanup
-	er = 0
+Sub Main
+    Dim App As Object
+    Set App = feGetObject()
 
-	Dim elset As Object
-	Set elset = App.feSet()
+    Dim elset As Object
+    Dim ndset As Object
+    Dim el As Object
+    Dim nd As Object
+    Dim rc As Long
+    Dim elID As Long
+    Dim ndID As Long
+    Dim i As Long
+    Dim numnode As Long
+    Dim sx As Double
+    Dim sy As Double
+    Dim sz As Double
+    Dim nds() As Long
+    Dim face() As Long
+    Dim weight() As Double
+    Dim dof() As Long
+    Dim newNodeID As Long
+    Dim newElemID As Long
 
-	Dim el As Object
-	Set el = App.feElem()
+    Set elset = App.feSet()
+    Set ndset = App.feSet()
+    Set el = App.feElem()
+    Set nd = App.feNode()
 
-	Dim ndset As Object
-	Set ndset = App.feSet()
+    On Error GoTo ErrorHandler
 
-	Dim nd As Object
-	Set nd = App.feNode()
+    rc = elset.Select(C_FT_ELEM, True, "Select BEAM elements for RBE3 spider:")
+    If (rc <> C_FE_OK) Or (elset.Count() < 1) Then GoTo ExitHere
 
-	Dim numnode As Long
-	Dim entID As Variant
-	Dim xyz As Variant
-	Dim lay As Variant
-	Dim col As Variant
-	Dim tp As Variant
-	Dim defCSys As Variant
-	Dim outCSys As Variant
-	Dim permBC As Variant
+    rc = elset.Reset()
+    elID = elset.Next()
+    Do While elID <> 0
+        rc = el.Get(elID)
+        If (rc = C_FE_OK) And (el.type = C_FET_BEAM) Then
+            rc = ndset.Add(el.Node(0))
+            rc = ndset.Add(el.Node(1))
+        End If
+        elID = elset.Next()
+    Loop
 
-	Dim weight() As Double
-	Dim DOF() As Long
-	Dim midnd(2) As Double
+    numnode = ndset.Count()
+    If numnode < 2 Then
+        MsgBox "At least two unique BEAM end nodes are required."
+        GoTo ExitHere
+    End If
 
+    ReDim nds(numnode - 1)
+    ReDim face(numnode - 1)
+    ReDim weight(numnode - 1)
+    ReDim dof(numnode * 6 - 1)
 
-	rc = elset.Select(8, True, "Select elements for RBE3 Spider:")
-	If (rc <> -1) Or (elset.Count < 1) Then
-		er = 1
-		GoTo cleanup
-	End If
+    rc = ndset.Reset()
+    For i = 0 To numnode - 1
+        ndID = ndset.Next()
+        nds(i) = ndID
+        face(i) = 0
+        weight(i) = 1#
+        dof(i * 6) = 1
+        dof(i * 6 + 1) = 1
+        dof(i * 6 + 2) = 1
+        dof(i * 6 + 3) = 0
+        dof(i * 6 + 4) = 0
+        dof(i * 6 + 5) = 0
 
-	rc = elset.Reset
+        rc = nd.Get(ndID)
+        If rc = C_FE_OK Then
+            sx = sx + nd.x
+            sy = sy + nd.y
+            sz = sz + nd.z
+        End If
+    Next
 
-	Dim els() As Long
+    newNodeID = nd.NextEmptyID()
+    nd.x = sx / numnode
+    nd.y = sy / numnode
+    nd.z = sz / numnode
+    rc = nd.Put(newNodeID)
+    If rc <> C_FE_OK Then GoTo ExitHere
 
-	ReDim els(elset.Count() * 2 - 1)
-	i = -2
+    newElemID = el.NextEmptyID()
+    el.ID = newElemID
+    el.type = C_FET_RIGID
+    el.topology = C_FTO_RIGID
+    el.RigidInterpolate = True
+    el.color = C_RBE3_COLOR
+    el.Node(0) = newNodeID
+    el.release(0, 0) = 1
+    el.release(0, 1) = 1
+    el.release(0, 2) = 1
+    rc = el.PutNodeList(0, numnode, nds, face, weight, dof)
+    If rc = C_FE_OK Then rc = el.Put(newElemID)
+    If rc = C_FE_OK Then Call App.feAppMessage(C_FCM_NORMAL, "Created RBE3 element " & CStr(newElemID) & ".")
+    GoTo ExitHere
 
-	On Error GoTo 0
+ErrorHandler:
+    MsgBox "Error " & CStr(Err.Number) & ": " & Err.Description
 
-	For j = 0 To elset.Count() - 1 Step 1
-	 	rc = el.Get(elset.Next())
-		If el.type = 5 Then
-			i = i + 2
-			els(i) = el.Node(0)
-			els(i + 1) = el.Node(1)
-			'rc = ndset.Add(el.Node(0))
-			'rc =ndset.Add(el.Node(1))
-		End If
-	Next
-
-	rc = ndset.AddArray(i + 2, els)
-
-	If ndset.Count < 2 Then
-		er = 2
-		GoTo Cleanup
-	End If
-
-	rc = ndset.Reset()
-
-	rc = nd.GetAllArray(ndset.ID, numnode, entID, xyz, lay, col, tp, defCSys, outCSys, permBC)
-
-	ReDim DOF(numnode * 6 - 1)
-	ReDim weight(numnode - 1)
-
-	midnd(0) = 0
-	midnd(1) = 0
-	midnd(2) = 0
-
-	For i = 0 To ndset.Count() - 1 Step 1
-		weight(i) = 1
-
-		DOF(i*6) = 1
-		DOF(i*6 + 1) = 1
-		DOF(i*6 + 2) = 1
-		DOF(i*6 + 3) = 0
-		DOF(i*6 + 4) = 0
-		DOF(i*6 + 5) = 0
-
-		midnd(0) = midnd(0) + xyz(i * 3)
-		midnd(1) = midnd(1) + xyz(i * 3 + 1)
-		midnd(2) = midnd(2) + xyz(i * 3 + 2)
-	Next
-
-	midnd(0) = midnd(0) / numnode
-	midnd(1) = midnd(1) / numnode
-	midnd(2) = midnd(2) / numnode
-
-	nd.ID = nd.NextEmptyID()
-	nd.x = midnd(0)
-	nd.y = midnd(1)
-	nd.z = midnd(2)
-	rc = nd.Put(nd.ID)
-
-	el.ID = el.NextEmptyID()
-	el.type = 29
-	el.topology = 13
-	el.RigidInterpolate = True
-	el.Node(0) = nd.ID()
-	el.release(0, 0) = 1
-	el.release(0, 1) = 1
-	el.release(0, 2) = 1
-	rc = el.PutNodeList(0, numnode, entID, Null, weight, DOF)
-	rc =el.Put(el.ID)
-	If DBUG Then App.feAppMessage(FCM_NORMAL, "Created element: " & el.ID)
-
-Cleanup:
-	On Error Resume Next
-		Set elset = Nothing
-		If DBUG Then App.feAppMessage(FCM_NORMAL, "The script exited with code " & er)
-		Set App = Nothing
+ExitHere:
+    Set nd = Nothing
+    Set el = Nothing
+    Set ndset = Nothing
+    Set elset = Nothing
+    Set App = Nothing
 End Sub

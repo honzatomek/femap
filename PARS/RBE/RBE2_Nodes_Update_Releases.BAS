@@ -1,121 +1,116 @@
-Attribute VB_Name = "Module2"
+' =============================================================================
+' Description: Updates reference-node releases and listed-node DOF participation for selected RBE2 elements.
+' Compatibility: Nastran for Windows 2004 and modern FEMAP.
+' =============================================================================
+
 Option Explicit
 
-Const DBUG As Boolean = False
-Dim tr(5) As Boolean
+' Updates reference-node releases and listed-node DOFs of selected RBE2 elements.
+' Written against the common N4W 2004 / modern FEMAP BASIC/API subset.
+
+Const C_FE_OK As Long = -1
+Const C_FT_ELEM As Long = 8
+Const C_FET_RIGID As Long = 29
+Const C_FTO_RIGID As Long = 13
+
+Dim gDof(5) As Long
 
 Sub Main
-	Dim App As femap.model
-    Set App = feFemap()
-    Dim rc As Long, i As Long
-
-    On Error GoTo ExitHere
+    Dim App As Object
+    Set App = feGetObject()
 
     Dim elset As Object
-    Set elset = App.feSet()
     Dim el As Object
-    Set el = App.feElem()
+    Dim rc As Long
     Dim elID As Long
-    Dim tmp As Variant
-    Dim thexp As Double
-
+    Dim i As Long
     Dim nodecount As Long
     Dim n As Variant
-	Dim f As Variant
-	Dim w As Variant
-	Dim DOF As Variant
+    Dim f As Variant
+    Dim w As Variant
+    Dim dof As Variant
 
-	For i = 0 To 5 Step 1
-		tr(i) = True
-	Next
+    Set elset = App.feSet()
+    Set el = App.feElem()
 
-	Begin Dialog UserDialog 310,105,"RBE2 Nodes Releases Update",.rbe2dlg ' %GRID:10,7,1,1
-		GroupBox 10,7,190,91,"Select DOF:",.GroupBox1
-		CheckBox 20,28,90,14,"T1",.t1
-		CheckBox 20,49,90,14,"T2",.t2
-		CheckBox 20,70,90,14,"T3",.t3
-		CheckBox 120,28,90,14,"R1",.r1
-		CheckBox 120,49,90,14,"R2",.r2
-		CheckBox 120,70,90,14,"R3",.r3
-		OKButton 210,14,90,21
-		CancelButton 210,42,90,21
-	End Dialog
-	Dim dlg As UserDialog
-	Do While Dialog(dlg) = -1
-		rc = elset.Select(8, True, "Select Rigid elements for DOF Update (RBE2)")
-		If rc <> -1 Then GoTo ExitHere
-		rc = elset.Reset()
+    For i = 0 To 5
+        gDof(i) = 1
+    Next
 
-		elID = elset.Next()
+    On Error GoTo ErrorHandler
 
-		Do While elID <> 0
-			rc = el.Get(elID)
-			If (el.type = 29) And (el.topology = 13) And (Not el.RigidInterpolate) Then ' (Not el.RigidInterpolate)
-				rc = el.GetNodeList(0, nodecount, n, f, w, DOF)
-				If DBUG Then
-					Debug.Print "Element: " & el.ID
-					For i = 0 To 5
-						Debug.Print "Release " & i & ": " & el.release(0,i)
-					Next
-					For i = 0 To nodecount - 1 Step 1
-						Debug.Print "Slave Node: " & n(i) & " Releases :" & DOF(6*i) & DOF(6*i + 1)& DOF(6*i + 2) & DOF(6*i +3) & DOF(6*i + 4) & DOF(6*i + 5)
-					Next
-				End If
+    Begin Dialog UserDialog 310,105,"RBE2 Nodes Releases Update",.Rbe2Dlg
+        GroupBox 10,7,190,91,"Select DOF:",.GroupBox1
+        CheckBox 20,28,90,14,"T1",.t1
+        CheckBox 20,49,90,14,"T2",.t2
+        CheckBox 20,70,90,14,"T3",.t3
+        CheckBox 120,28,90,14,"R1",.r1
+        CheckBox 120,49,90,14,"R2",.r2
+        CheckBox 120,70,90,14,"R3",.r3
+        OKButton 210,14,90,21
+        CancelButton 210,42,90,21
+    End Dialog
+    Dim dlg As UserDialog
 
-				For i = 0 To 5
-					el.release(0,i) = tr(i)
-				Next
-				For i = 0 To nodecount - 1 Step 1
-					DOF(6*i) = tr(0)
-					DOF(6*i + 1) = tr(1)
-					DOF(6*i + 2) = tr(2)
-					DOF(6*i +3) = tr(3)
-					DOF(6*i + 4) = tr(4)
-					DOF(6*i + 5) = tr(5)
-				Next
+    Do While Dialog(dlg) = C_FE_OK
+        rc = elset.Select(C_FT_ELEM, True, "Select RBE2 elements for DOF update:")
+        If rc <> C_FE_OK Then Exit Do
 
-				rc = el.PutNodeList(0, nodecount, n, f, w, DOF)
+        rc = elset.Reset()
+        elID = elset.Next()
+        Do While elID <> 0
+            rc = el.Get(elID)
+            If (rc = C_FE_OK) And (el.type = C_FET_RIGID) And (el.topology = C_FTO_RIGID) And (Not el.RigidInterpolate) Then
+                rc = el.GetNodeList(0, nodecount, n, f, w, dof)
+                If rc = C_FE_OK Then
+                    For i = 0 To 5
+                        el.release(0, i) = (gDof(i) <> 0)
+                    Next
+                    For i = 0 To nodecount - 1
+                        dof(6 * i) = gDof(0)
+                        dof(6 * i + 1) = gDof(1)
+                        dof(6 * i + 2) = gDof(2)
+                        dof(6 * i + 3) = gDof(3)
+                        dof(6 * i + 4) = gDof(4)
+                        dof(6 * i + 5) = gDof(5)
+                    Next
+                    rc = el.PutNodeList(0, nodecount, n, f, w, dof)
+                    If rc = C_FE_OK Then rc = el.Put(el.ID)
+                End If
+            End If
+            elID = elset.Next()
+        Loop
+        Call App.feViewRegenerate(1)
+    Loop
 
-				rc = el.Put(el.ID)
-			End If
+    GoTo ExitHere
 
-			elID = elset.Next()
-		Loop
-	feFemap.feViewRegenerate(1)
-	Loop
+ErrorHandler:
+    MsgBox "Error " & CStr(Err.Number) & ": " & Err.Description
 
 ExitHere:
-	On Error Resume Next
-	Set el = Nothing
-	Set elset = Nothing
-	Set App = Nothing
+    Set el = Nothing
+    Set elset = Nothing
+    Set App = Nothing
 End Sub
 
-Rem See DialogFunc help topic for more information.
-Private Function rbe2dlg(DlgItem$, Action%, SuppValue?) As Boolean
-	Dim i As Long
-	Select Case Action%
-	Case 1 ' Dialog box initialization
-		For i = 0 To 5 Step 1
-			DlgValue(i+1, tr(i))
-		Next
-	Case 2 ' Value changing or button pressed
-		Rem rbe2dlg = True ' Prevent button press from closing the dialog box
-		rbe2dlg = True
-		Select Case DlgItem$
-		Case "OK"
-			rbe2dlg = False
-		Case "Cancel"
-			rbe2dlg = False
-		Case Else
-			i = DlgNumber(DlgItem$)
-			tr(i - 1) = DlgValue(i)
-		End Select
-	Case 3 ' TextBox or ComboBox text changed
-	Case 4 ' Focus changed
-		'Debug.Print DlgItem$ & ", " & Action% & ", " & SuppValue?
-	Case 5 ' Idle
-		Rem Wait .1 : rbe2dlg = True ' Continue getting idle actions
-	Case 6 ' Function key
-	End Select
+Private Function Rbe2Dlg(DlgItem, Action, SuppValue) As Boolean
+    Dim i As Long
+    Select Case Action
+    Case 1
+        For i = 0 To 5
+            Call DlgValue(i + 1, gDof(i))
+        Next
+    Case 2
+        Rbe2Dlg = True
+        Select Case DlgItem
+        Case "OK"
+            Rbe2Dlg = False
+        Case "Cancel"
+            Rbe2Dlg = False
+        Case Else
+            i = DlgNumber(DlgItem)
+            If (i >= 1) And (i <= 6) Then gDof(i - 1) = DlgValue(i)
+        End Select
+    End Select
 End Function

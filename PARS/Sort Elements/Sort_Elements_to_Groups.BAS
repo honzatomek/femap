@@ -1,3 +1,8 @@
+' =============================================================================
+' Description: Sorts beam elements into groups using modern FEMAP BeamCalculator data.
+' Compatibility: Modern FEMAP only; the script shows an early compatibility message on N4W 2004.
+' =============================================================================
+
 Option Explicit
 
 Const DBUG As Boolean = False
@@ -10,12 +15,21 @@ Private grpset As Object
 Private grpID As Long
 Private tmp As Variant
 Private focus As Boolean
-Private Beams As Object
 Private overwriteL As Boolean
+Private App As Object
+
+Const C_FT_GROUP As Long = 24
+Const C_FT_ELEM As Long = 8
+Const C_FT_PROP As Long = 11
+Const C_FT_TEXT As Long = 21
+Const C_FCM_NORMAL As Long = 0
 
 Sub Main
-    Dim App As femap.model
-    Set App = feFemap()
+    Set App = feGetObject()
+    If Not ModernFemapAvailable() Then
+        MsgBox "This sorter requires a modern FEMAP version (multi-group view API and Beam Calculator). It is not portable to Nastran for Windows 2004.", 48, "Not available in N4W 2004"
+        GoTo ExitHere
+    End If
     Dim rc As Long
     Dim tmp As Variant
     Dim i As Long
@@ -26,30 +40,8 @@ Sub Main
 		On Error GoTo ExitHere
 	End If
 
-	Set Beams = App.feSet()
 	Dim grp As Object
 	Set grp = App.feGroup()
-
-	For i = 1 To 10000
-		rc = Beams.Reload2(i)
-		If rc = -1 Then
-			Beams.Save = True
-			rc = Beams.First()
-			If grp.Get(rc) = -1 Then
-				If Left$(grp.title, 4) = "BEAM" Then
-					rc = -1
-					Exit For
-				End If
-			End If
-		End If
-		rc = 0
-	Next
-
-	If rc <> -1 Then
-		Set Beams = App.feSet()
-	End If
-
-	Beams.Save = True
 
     Dim v As Object
     Set v = App.feView
@@ -60,7 +52,7 @@ Sub Main
     Dim grsview2 As Variant
 
     rc = v.Get(1)
-    rc =grs.Select(FT_GROUP, True, "Select groups to be viewed, select non = same view:")
+    rc =grs.Select(C_FT_GROUP, True, "Select groups to be viewed, select non = same view:")
     If rc <> -1 Then GoTo ExitHere
 
     If grs.Count() > 0 Then
@@ -103,7 +95,7 @@ Sub Main
 	Set ndset(2) = App.feSet()
 	Set elset = App.feSet()
 
-	ReDim elArray(0) As String
+	ReDim elArray(0)
 	elArray(0) = "Push Add to Start.."
 	lenmult(0) = 1
 	lenmult(1) = 1
@@ -165,8 +157,8 @@ Sub Main
 		rc = ndset(2).Clear()
 		rc = elset.Clear()
 		tmp = -1
-		rc = Dialog(dlg)
-		If rc = -1 Then
+		If Dialog(dlg) = -1 Then
+			rc = -1
 			'ReDim grsview2
 			rc = v.GetMultiGroupList(i, grsview2)
 			ReDim Preserve grsview2(i)
@@ -175,6 +167,8 @@ Sub Main
 		    rc = v.Put(1)
 		    rc = v.Visible(True)
 		    rc = v.Regenerate()
+		Else
+			rc = 0
 		End If
 	Loop
 	If (rc = 0)  Then GoTo ExitHere
@@ -227,7 +221,7 @@ Private Function GroupElementsBeams(DlgItem$, Action%, SuppValue?) As Boolean
 		Rem GroupElementsBeams = True ' Prevent button press from closing the dialog box
 		If DBUG Then Debug.Print(DlgItem$ & vbTab & Action% & vbTab & SuppValue?)
 		GroupElementsBeams = True
-		Call feFemap.feViewRegenerate(0)
+		Call App.feViewRegenerate(0)
 		Select Case DlgItem$
 		Case "OK"
 			Call CreateGroup()
@@ -313,7 +307,7 @@ Private Function GroupElementsBeams(DlgItem$, Action%, SuppValue?) As Boolean
 			If Not IsNumeric(DlgText("groupID")) Then
 				Call DlgText("groupID", CStr(grpID))
 			Else
-				If feFemap.feGroup.Get(CLng(DlgText("groupID"))) = -1 Then
+				If GroupIDExists(CLng(DlgText("groupID"))) Then
 					Call DlgText("groupID", CStr(grpID))
 				Else
 					grpID = DlgText("groupID")
@@ -362,10 +356,10 @@ Private Sub AddElements()
 	Dim rc As Long
 	Dim i As Long
 	Dim el As Object
-	Set el = feFemap.feElem()
+	Set el = App.feElem()
 	Dim l As Double
 
-	If elset.Count > 0 Then Call feFemap.feViewShow(8, elset.ID)
+	If elset.Count > 0 Then Call App.feViewShow(C_FT_ELEM, elset.ID)
 
 	rc = elset.Select(8, False, "Select elements in one BEAM:")
 	If rc <> -1 Then Exit Sub
@@ -386,7 +380,7 @@ Private Sub ResetElements()
 
 	rc = elset.Reset()
 
-	ReDim elArray(0) As String
+	ReDim elArray(0)
 	elArray(0) = "Push Add to Start.."
 	length(3) = 0
 	overwriteL = False
@@ -396,7 +390,7 @@ Private Sub RemoveElement(ByVal index As Long)
 	Dim rc As Long
 	Dim i As Long
 	Dim el As Object
-	Set el = feFemap.feElem()
+	Set el = App.feElem()
 	Dim l As Double
 
 	rc = elset.Remove(elArray(index))
@@ -413,11 +407,11 @@ Private Sub RemoveElement(ByVal index As Long)
 End Sub
 
 Private Sub ShowElements()
-	If elset.Count > 0 Then Call feFemap.feViewShow(8, elset.ID)
+	If elset.Count > 0 Then Call App.feViewShow(C_FT_ELEM, elset.ID)
 End Sub
 
 Private Sub ShowElement(ByVal index As Long)
-	If Not elArray(index) = "Push Add to Start.." Then Call feFemap.feViewShow(8, -CLng(elArray(index)))
+	If Not elArray(index) = "Push Add to Start.." Then Call App.feViewShow(C_FT_ELEM, -CLng(elArray(index)))
 End Sub
 
 Private Function SelectNodes(ByVal index As Long) As String
@@ -448,15 +442,13 @@ Private Function NodesDistance(ByVal index As Long) As Double
 	ndID1 = ndset(index).First()
 	ndID2 = ndset(index).Last()
 
-	rc = feFemap.feMeasureDistanceBetweenNodes(ndID1, ndID2, 0, 0, 0, vecBase, vecdist, magDist)
+	rc = App.feMeasureDistanceBetweenNodes(ndID1, ndID2, 0, 0, 0, vecBase, vecdist, magDist)
 
 	NodesDistance = magDist
 End Function
 
 Private Sub CreateGroup()
-	Dim App As femap.model
-	Set App = feFemap
-	Dim rc As Long
+		Dim rc As Long
 	Dim data As String
 	Dim i As Long
 
@@ -485,7 +477,7 @@ Private Sub CreateGroup()
 	bc.Element = el.ID
 	rc = bc.GetElementProperties(properties(0), properties(1), properties(2), properties(3), properties(4), properties(5), properties(6), properties(7), properties(8), properties(9))
 
-	data = Join(Array(length(0) * lenmult(0), length(1) * lenmult(1), length(2) * lenmult(2), length(3)), vbTab)
+	data = CStr(length(0) * lenmult(0)) & Chr(9) & CStr(length(1) * lenmult(1)) & Chr(9) & CStr(length(2) * lenmult(2)) & Chr(9) & CStr(length(3))
 	data = data & Chr(13) & vbLf  & "[" & prp.ID & "] - " & prp.title
 	data = data & Chr(13) & vbLf
 
@@ -494,18 +486,16 @@ Private Sub CreateGroup()
 	Next
 	data = Left$(data, Len(data) - 1)
 
-	If DBUG Then rc = App.feAppMessage(FCM_NORMAL, data)
+	If DBUG Then rc = App.feAppMessage(C_FCM_NORMAL, data)
 
 	txt.text = data
 	rc = txt.Put(grpID)
 
 	grp.title= "BEAM" & grpID & "[" & prp.ID & "] - " & prp.title
 	rc = grp.SetAdd(8, elset.ID)
-	rc = grp.Add(FT_PROP, prp.ID)
-	rc = grp.Add(FT_TEXT, grpID)
+	rc = grp.Add(C_FT_PROP, prp.ID)
+	rc = grp.Add(C_FT_TEXT, grpID)
 	rc = grp.Put(grpID)
-
-	rc = Beams.Add(grp.ID)
 
 	rc = elset.Clear()
 	rc = ndset(0).Clear
@@ -523,3 +513,45 @@ Private Sub CreateGroup()
 	Set txt = Nothing
 	Set App = Nothing
 End Sub
+
+
+Private Function ModernFemapAvailable() As Boolean
+    Dim bc As Object
+    Dim v As Object
+    Dim n As Long
+    Dim a As Variant
+    Dim rcModernProbe As Long
+
+    ModernFemapAvailable = False
+    If App.Info_Version < 11.1 Then Exit Function
+
+    On Error Resume Next
+    Err.Clear
+    Set bc = App.feBeamCalculator()
+    If Err.Number <> 0 Then
+        Err.Clear
+        ModernFemapAvailable = False
+        Exit Function
+    End If
+    Set v = App.feView()
+    v.Get 1
+    rcModernProbe = v.GetMultiGroupList(n, a)
+    If Err.Number <> 0 Then
+        Err.Clear
+        ModernFemapAvailable = False
+    Else
+        ModernFemapAvailable = True
+    End If
+    Set v = Nothing
+    Set bc = Nothing
+    On Error GoTo 0
+End Function
+
+Private Function GroupIDExists(ByVal groupID As Long) As Boolean
+    Dim g As Object
+    Dim rc As Long
+    Set g = App.feGroup()
+    rc = g.Get(groupID)
+    GroupIDExists = (rc = -1)
+    Set g = Nothing
+End Function

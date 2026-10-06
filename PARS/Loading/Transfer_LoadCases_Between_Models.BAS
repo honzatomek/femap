@@ -1,242 +1,244 @@
-Option Explicit On
+' =============================================================================
+' Description: Transfers load cases between FEMAP models open in the same modern FEMAP session.
+' Compatibility: Modern FEMAP only; the script shows an early compatibility message on N4W 2004.
+' =============================================================================
+
+Option Explicit
 
 Const DBUG As Boolean = True
+Const C_FE_OK As Long = -1
+Const C_FT_NODE As Long = 7
+Const C_FT_OUT_CASE As Long = 28
+Const C_FCM_NORMAL As Long = 0
 Private er As Long
 
 Sub Main
-    Dim App As femap.model
-    Set App = feFemap()
-    Dim rc As Long, i As Long, j As Long, k As Long
+    Dim App As Object
+    Set App = feGetObject()
 
-	Dim LCSet As Object
-	Set LCSet = App.feSet()
-
-	Dim LC() As Object
-
-	Dim vec As Object
-	Set vec = App.feOutput()
-
-	Dim vecIDs As Variant
-
-	vecIDs = Array(192, 193, 194, 196, 197, 198)
-
-	Dim ndset As Object
-	Set ndset = App.feSet()
-
-	Dim ndIDs() As Long
-	Dim forces() As Variant
-
-	Dim modelID1 As PortInt
-	Dim modelID2 As PortInt
-
-	Dim numModels As Long
+    Dim rc As Long
+    Dim i As Long, j As Long, k As Long
+    Dim numModels As Long
     Dim modelIDs As Variant
 
+    'The multi-model application API was added long after Nastran for Windows 2004.
+    'Gate N4W by the legacy version property before dispatching any modern method.
+    If App.Info_Version < 10# Then GoTo NotPortable
+
+    On Error GoTo NotPortable
     rc = App.feAppGetAllModels(numModels, modelIDs)
+    On Error GoTo 0
+
+    If numModels < 2 Then
+        MsgBox "Open at least two FEMAP models before running this script.", 48, "Transfer Load Cases Between Models"
+        GoTo Cleanup
+    End If
 
     er = 0
-
     If Not DBUG Then On Error GoTo Cleanup
 
-	modelID1 = selectmodel(0, "Select Model to copy LCs from:")
-	If modelID1 = -1 Then
-		er = 1
-		GoTo Cleanup
-	End If
+    Dim sourceIndex As Long
+    Dim targetIndex As Long
+    sourceIndex = SelectModelIndex(App, modelIDs, numModels, 0, "Select model to copy load cases from:")
+    If sourceIndex < 0 Then
+        er = 1
+        GoTo Cleanup
+    End If
 
-	rc = 0
-	Do While rc <> -1
-		modelID2 = selectmodel(1, "Select Model to copy  LCs to:")
-		If modelID2 = -1 Then
-			er = 2
-			GoTo Cleanup
-		ElseIf modelID1 <> modelID2 Then
-			rc = -1
-		End If
-	Loop
+    Do
+        targetIndex = SelectModelIndex(App, modelIDs, numModels, 1, "Select model to copy load cases to:")
+        If targetIndex < 0 Then
+            er = 2
+            GoTo Cleanup
+        End If
+    Loop While targetIndex = sourceIndex
 
-	modelID1 = modelIDs(modelID1)
-	modelID2 = modelIDs(modelID2)
+    Dim sourceModel As Variant
+    Dim targetModel As Variant
+    sourceModel = modelIDs(sourceIndex)
+    targetModel = modelIDs(targetIndex)
 
-	rc = App.feAppSetModel(modelID1)
+    rc = App.feAppSetModel(sourceModel)
 
-	rc = LCSet.SelectMultiID(FT_OUT_CASE, 1, "Select Output Sets To be Transformed:")
-	If (rc <> -1) Or (LCSet.Count() < 1) Then
-		er = 3
-		GoTo Cleanup
-	End If
+    Dim LCSet As Object
+    Dim ndset As Object
+    Set LCSet = App.feSet()
+    Set ndset = App.feSet()
 
-	rc = ndset.Select(FT_NODE, True, "Select Nodes for Trasformation:")
-	If (rc <> -1) Or (ndset.Count() < 1) Then
-		er = 4
-		GoTo Cleanup
-	End If
+    rc = LCSet.Select(C_FT_OUT_CASE, True, "Select Output Sets to be transformed:")
+    If (rc <> C_FE_OK) Or (LCSet.Count() < 1) Then
+        er = 3
+        GoTo Cleanup
+    End If
 
-	ReDim ndIDs(ndset.Count() - 1)
-	ReDim forces(ndset.Count() - 1)
+    rc = ndset.Select(C_FT_NODE, True, "Select nodes for transformation:")
+    If (rc <> C_FE_OK) Or (ndset.Count() < 1) Then
+        er = 4
+        GoTo Cleanup
+    End If
 
-	rc = ndset.Reset()
-	For i = 0 To ndset.Count() - 1 Step 1
-		ndIDs(i) = ndset.Next()
-		forces(i) = Array(0,0,0,0,0,0)
-	Next
+    Dim ndIDs() As Long
+    Dim f1() As Double, f2() As Double, f3() As Double
+    Dim m1() As Double, m2() As Double, m3() As Double
+    Dim nNodes As Long
+    nNodes = ndset.Count()
+    ReDim ndIDs(nNodes - 1)
+    ReDim f1(nNodes - 1)
+    ReDim f2(nNodes - 1)
+    ReDim f3(nNodes - 1)
+    ReDim m1(nNodes - 1)
+    ReDim m2(nNodes - 1)
+    ReDim m3(nNodes - 1)
 
-	Dim LCnew As Object
-	Set LCnew = App.feLoadSet()
-
-	Dim Ld As Object
-	Set Ld = App.feLoadMesh()
-
-	ReDim LC(LCSet.Count() - 1)
-	rc = LCSet.Reset()
-	For i = 0 To LCSet.Count() - 1 Step 1
-		rc = App.feAppSetModel(modelID1)
-		Set LC(i) = App.feOutputSet()
-		rc = LC(i).Get(LCSet.Next())
-		For j = 0 To 5 Step 1
-			Set vec = LC(i).Vector(vecIDs(j))
-			For k = 0 To UBound(ndIDs) Step 1
-				forces(k)(j) = vec.Value(ndIDs(k))
-			Next
-		Next
-
-		rc = App.feAppSetModel(modelID2)
-		LCnew.ID = LCnew.NextEmptyID()
-		LCnew.title = LC(i).title
-		rc = LCnew.Put(LCnew.ID)
-		Ld.CSys = 0
-		Ld.setID = LCnew.ID
-		Ld.XOn = True
-		Ld.YOn = True
-		Ld.ZOn = True
-		For j = 0 To UBound(ndIDs)
-			Ld.ID = Ld.NextEmptyID()
-			Ld.meshID = ndIDs(j)
-			Ld.type = 1 '1 = nForce, 2 = nMoment
-			Ld.load(0) = forces(j)(0)
-			Ld.load(1) = forces(j)(1)
-			Ld.load(2) = forces(j)(2)
-			rc = Ld.Put(Ld.ID)
-		Next
-	Next
-
-	er = 0
-Cleanup:
-	Call App.feAppMessage(FCM_NORMAL, "The script exited with code: " & er)
-	On Error Resume Next
-	Set App = Nothing
-End Sub
-
-Private Function selectmodel(Optional ByVal preselect As Long = 0, Optional ByVal caption As String = "Select Model:") As Long
-	Dim App As femap.model
-    Set App = feFemap()
-    Dim rc As Long, i As Long
-
-	Dim ListArray() As String
-
-	Dim numModels As Long
-    Dim modelIDs As Variant
-
-    rc = App.feAppGetAllModels(numModels, modelIDs)
-
-    ReDim ListArray(numModels - 1)
-
-    For i = 0 To numModels - 1 Step 1
-		rc = App.feAppGetModelName(modelIDs(i), ListArray(i))
-		If InStr(1, ListArray(i), "\") <> 0 Then
-			ListArray(i) = Mid$(ListArray(i), InStrRev(ListArray(i), "\") + 1)
-		End If
-		ListArray(i) = i + 1 & " - " & ListArray(i)
+    rc = ndset.Reset()
+    For i = 0 To nNodes - 1
+        ndIDs(i) = ndset.Next()
     Next
 
-	Begin Dialog UserDialog 550,189,caption,.SelectModelFunc 'Allows User To Select Model from a list of Opened Models %GRID:10,7,1,1
-		ListBox 10,35,530,119,ListArray(),.ListBox1
-		OKButton 360,161,90,21
-		CancelButton 460,161,80,21
-		TextBox 10,7,530,21,.TextBox1
-	End Dialog
-	Dim dlg As UserDialog
-	dlg.TextBox1 = ListArray(preselect)
-	dlg.ListBox1 = preselect
-	txt = ListArray(preselect)
-	rc = Dialog(dlg)
+    Dim vecIDs(5) As Long
+    vecIDs(0) = 192
+    vecIDs(1) = 193
+    vecIDs(2) = 194
+    vecIDs(3) = 196
+    vecIDs(4) = 197
+    vecIDs(5) = 198
 
-	If rc <> -1 Then
-		selectmodel = -1
-	Else
-		selectmodel = dlg.ListBox1
-	End If
+    Dim outSet As Object
+    Dim vec As Object
+    Dim LCnew As Object
+    Dim Ld As Object
+    Set outSet = App.feOutputSet()
+    Set vec = App.feOutput()
+    Set LCnew = App.feLoadSet()
+    Set Ld = App.feLoadMesh()
 
-On Error Resume Next
-	Set App = Nothing
+    Dim outSetID As Long
+    rc = LCSet.Reset()
+    For i = 0 To LCSet.Count() - 1
+        rc = App.feAppSetModel(sourceModel)
+        outSetID = LCSet.Next()
+        rc = outSet.Get(outSetID)
+        If rc <> C_FE_OK Then
+            er = 5
+            GoTo Cleanup
+        End If
+
+        'Read force and moment vectors from the source output set using the old Output SetID/Get API.
+        For j = 0 To 5
+            vec.setID = outSet.ID
+            rc = vec.Get(vecIDs(j))
+            If rc <> C_FE_OK Then
+                er = 6
+                GoTo Cleanup
+            End If
+            For k = 0 To nNodes - 1
+                Select Case j
+                Case 0
+                    f1(k) = vec.Value(ndIDs(k))
+                Case 1
+                    f2(k) = vec.Value(ndIDs(k))
+                Case 2
+                    f3(k) = vec.Value(ndIDs(k))
+                Case 3
+                    m1(k) = vec.Value(ndIDs(k))
+                Case 4
+                    m2(k) = vec.Value(ndIDs(k))
+                Case 5
+                    m3(k) = vec.Value(ndIDs(k))
+                End Select
+            Next
+        Next
+
+        rc = App.feAppSetModel(targetModel)
+
+        LCnew.ID = LCnew.NextEmptyID()
+        LCnew.title = outSet.title
+        rc = LCnew.Put(LCnew.ID)
+        If rc <> C_FE_OK Then
+            er = 7
+            GoTo Cleanup
+        End If
+
+        'The original script creates nodal force loads. Preserve that behavior.
+        Ld.CSys = 0
+        Ld.setID = LCnew.ID
+        Ld.XOn = True
+        Ld.YOn = True
+        Ld.ZOn = True
+        For k = 0 To nNodes - 1
+            Ld.ID = Ld.NextEmptyID()
+            Ld.meshID = ndIDs(k)
+            Ld.type = 1
+            Ld.load(0) = f1(k)
+            Ld.load(1) = f2(k)
+            Ld.load(2) = f3(k)
+            rc = Ld.Put(Ld.ID)
+        Next
+    Next
+
+    er = 0
+    GoTo Cleanup
+
+NotPortable:
+    On Error Resume Next
+    MsgBox "This script requires the FEMAP multi-model API introduced after Nastran for Windows 2004 and is not portable to that version.", 48, "Not portable to N4W 2004"
+    Set App = Nothing
+    Exit Sub
+
+Cleanup:
+    On Error Resume Next
+    Call App.feAppMessage(C_FCM_NORMAL, "The script exited with code: " & er)
+    Set Ld = Nothing
+    Set LCnew = Nothing
+    Set vec = Nothing
+    Set outSet = Nothing
+    Set ndset = Nothing
+    Set LCSet = Nothing
+    Set App = Nothing
+End Sub
+
+Private Function SelectModelIndex(ByRef App As Object, ByVal modelIDs As Variant, ByVal numModels As Long, ByVal preselect As Long, ByVal caption As String) As Long
+    Dim i As Long
+    Dim rc As Long
+    Dim modelName As String
+    Dim prompt As String
+    Dim answer As String
+    Dim idx As Long
+
+    prompt = caption & vbLf & vbLf
+    For i = 0 To numModels - 1
+        modelName = ""
+        rc = App.feAppGetModelName(modelIDs(i), modelName)
+        prompt = prompt & CStr(i + 1) & " - " & BaseFileName(modelName) & vbLf
+    Next
+
+    Do
+        answer = InputBox(prompt, caption, CStr(preselect + 1))
+        If answer = "" Then
+            SelectModelIndex = -1
+            Exit Function
+        End If
+        If IsNumeric(answer) Then
+            idx = CLng(answer) - 1
+            If (idx >= 0) And (idx < numModels) Then
+                SelectModelIndex = idx
+                Exit Function
+            End If
+        End If
+    Loop
 End Function
 
-Private txt As String
-
-Rem See DialogFunc help topic for more information.
-Private Function selectmodelfunc(DlgItem$, Action%, SuppValue?) As Boolean
-	Dim tmp
-	Select Case Action%
-	Case 1 ' Dialog box initialization
-	Case 2 ' Value changing or button pressed
-		Rem selectmodel = True ' Prevent button press from closing the dialog box
-		selectmodelfunc = True
-		Select Case DlgItem$
-		Case "OK"
-			If IsNumeric(DlgText("TextBox1")) Then
-				tmp = CLng(DlgText("TextBox1"))
-				If (tmp > 0) And (tmp < DlgListBoxArray("ListBox1") + 1) Then
-					Call DlgValue("ListBox1", tmp - 1)
-					Call DlgText("TextBox1", DlgText("ListBox1"))
-					txt = DlgText("TextBox1")
-					selectmodelfunc = False
-				Else
-					DlgText("TextBox1", txt)
-				End If
-			Else
-				If DlgText("TextBox1") =DlgText("ListBox1") Then
-					selectmodelfunc = False
-				Else
-					tmp =DlgValue("ListBox1")
-					Call DlgText("TextBox1", DlgText("ListBox1"))
-				End If
-			End If
-		Case "Cancel"
-			selectmodelfunc = False
-		Case "ListBox1"
-			Call DlgText("TextBox1", DlgText(DlgItem))
-			txt = DlgText("TextBox1")
-		Case "TextBox1"
-		End Select
-	Case 3 ' TextBox or ComboBox text changed
-		Select Case DlgItem$
-		Case "TextBox1"
-
-		End Select
-	Case 4 ' Focus changed
-		If SuppValue? < DlgCount() Then
-			Select Case DlgName(SuppValue?)
-			Case "TextBox1"
-				If IsNumeric(DlgText("TextBox1")) Then
-					tmp = CLng(DlgText("TextBox1"))
-					If (tmp > 0) And (tmp < DlgListBoxArray("ListBox1") + 1) Then
-						Call DlgValue("ListBox1", tmp - 1)
-						Call DlgText("TextBox1", DlgText("ListBox1"))
-						txt = DlgText("TextBox1")
-					Else
-						DlgText("TextBox1", txt)
-					End If
-				Else
-					tmp =DlgValue("ListBox1")
-					Call DlgText("TextBox1", DlgText("ListBox1"))
-				End If
-			End Select
-			Select Case DlgItem
-			Case "TextBox1"
-			End Select
-		End If
-	Case 5 ' Idle
-		Rem Wait .1 : selectmodel = True ' Continue getting idle actions
-	Case 6 ' Function key
-	End Select
+Private Function BaseFileName(ByVal fileName As String) As String
+    Dim i As Long
+    For i = Len(fileName) To 1 Step -1
+        If Mid$(fileName, i, 1) = "\\" Then
+            BaseFileName = Mid$(fileName, i + 1, Len(fileName) - i)
+            Exit Function
+        End If
+    Next
+    If fileName = "" Then
+        BaseFileName = "Untitled"
+    Else
+        BaseFileName = fileName
+    End If
 End Function

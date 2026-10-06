@@ -1,170 +1,186 @@
-Option Explicit On
+' =============================================================================
+' Description: Creates a group of elements that remain in compression across selected output-set combinations.
+' Compatibility: Nastran for Windows 2004 and modern FEMAP.
+' =============================================================================
 
-Const DBUG As Boolean = True
+Option Explicit
+
+'Creates a group containing elements that remain in compression for the
+'dead-load output set combined with every selected additional output set.
+'Uses only API calls available in the old Nastran for Windows/FEMAP API.
+
+Const DBUG As Boolean = False
+Const C_FE_OK As Long = -1
+Const C_FT_ELEM As Long = 8
+Const C_FT_GROUP As Long = 24
+Const C_FT_OUT_CASE As Long = 28
+Const C_FCM_NORMAL As Long = 0
+
 Private er As Long
 
 Sub Main
-    Dim App As femap.model
-    Set App = feFemap()
-    Dim rc As Long, i As Long, j As Long
+    Dim App As Object
+    Set App = feGetObject()
+
+    Dim rc As Long
+    Dim i As Long
+    Dim j As Long
+    Dim deadSetID As Long
+    Dim outSetID As Long
+    Dim currentGroupID As Long
+    Dim nextGroupID As Long
+    Dim tempGroupID As Long
 
     er = 0
-
     If Not DBUG Then On Error GoTo Cleanup
 
-    Dim osetG As Object
-    Set osetG = App.feOutputSet()
+    Dim deadSet As Object
+    Set deadSet = App.feOutputSet()
+    Dim outSet As Object
+    Set outSet = App.feOutputSet()
+    Dim outSets As Object
+    Set outSets = App.feSet()
 
-    Dim ovecG As Object
-    Set ovecG = App.feOutput()
+    Dim deadVec As Object
+    Set deadVec = App.feOutput()
+    Dim outVec As Object
+    Set outVec = App.feOutput()
 
-    Dim listcountG As Long
-    Dim IDG As Variant
-    Dim valueG As Variant
+    Dim elemSet As Object
+    Set elemSet = App.feSet()
+    Dim gBase As Object
+    Set gBase = App.feGroup()
+    Dim gTemp As Object
+    Set gTemp = App.feGroup()
+    Dim gResult As Object
+    Set gResult = App.feGroup()
 
-	Dim osets As Object
-	Set osets = App.feSet()
+    Dim listCount As Long
+    Dim elemIDs As Variant
+    Dim deadValues As Variant
 
-    Dim oset As Object
-    Set oset = App.feOutputSet()
-
-    Dim ovec As Object
-    Set ovec = App.feOutput()
-
-    Dim listcount As Long
-    Dim ID As Variant
-    Dim value As Variant
-
-    Dim g1 As Object
-    Set g1 = App.feGroup()
-
-    Dim g2() As Object
-    'Set g2 = App.feGroup()
-
-    Dim gset As Object
-    Set gset = App.feSet()
-
-'1
+    '1. Select the dead-load output set.
     If DBUG Then
-    	rc = osetG.Get(11)
-    	If rc <> -1 Then
-    		er = 1
-    		GoTo Cleanup
-    	End If
-    	Debug.Print osetG.title()
+        deadSetID = 11
+        rc = deadSet.Get(deadSetID)
     Else
-		rc = osets.SelectID(FT_OUT_CASE, "Select Dead Load Output Set:", i)
-		If rc <> -1 Then
-			er = 1
-			GoTo Cleanup
-		End If
-		rc = osetG.Get(i)
-		If rc <> -1 Then
-			er = 1
-			GoTo Cleanup
-		End If
-		rc = osets.Clear()
-	End If
+        rc = outSets.SelectID(C_FT_OUT_CASE, "Select Dead Load Output Set:", deadSetID)
+        If rc <> C_FE_OK Then
+            er = 1
+            GoTo Cleanup
+        End If
+        rc = deadSet.Get(deadSetID)
+    End If
+    If rc <> C_FE_OK Then
+        er = 1
+        GoTo Cleanup
+    End If
 
-'2
-	rc = osets.SelectMultiID(FT_OUT_CASE, 1, "Select Output Sets other than Dead Load:")
-	If rc <> -1 Then
-		er = 2
-		GoTo Cleanup
-	End If
-	ReDim g2(osets.Count())
+    '2. Select all additional output sets. Set.Select is available in old FEMAP.
+    rc = outSets.Clear()
+    rc = outSets.Select(C_FT_OUT_CASE, True, "Select Output Sets other than Dead Load:")
+    If (rc <> C_FE_OK) Or (outSets.Count() < 1) Then
+        er = 2
+        GoTo Cleanup
+    End If
 
-'3
-	rc = ovecG.GetFromSet(osetG.ID, 3022)
-	If rc <> -1 Then
-		er = 3
-		GoTo Cleanup
-	End If
-	rc = ovecG.GetOutputList(listcountG, IDG, valueG)
-	g1.title = "Temp for Output processing"
-	For i = 0 To listcountG - 1 Step 1
-		If valueG(i) < 0 Then
-			rc = g1.Add(FT_ELEM, IDG(i))
-		End If
-	Next
-	rc = g1.Put(g1.NextEmptyID())
-	rc = gset.Add(g1.ID)
+    '3. Read vector 3022 from the dead-load set using the old SetID/Get pattern.
+    deadVec.setID = deadSet.ID
+    rc = deadVec.Get(3022)
+    If rc <> C_FE_OK Then
+        er = 3
+        GoTo Cleanup
+    End If
+    rc = deadVec.GetOutputList(listCount, elemIDs, deadValues)
+    If rc <> C_FE_OK Then
+        er = 3
+        GoTo Cleanup
+    End If
 
-'4
-	rc = osets.Reset()
-	i = -1
-	Do While osets.Next() <> 0
-		i = i + 1
-		Set g2(i) = App.feGroup()
-		g2(i).title = "Temp for Output processing"
-		rc = oset.Get(osets.CurrentID())
-		If DBUG Then Debug.Print oset.title()
-		rc = ovec.GetFromSet(oset.ID, 3022)
-		If rc <> -1 Then
-			er = 4
-			GoTo Cleanup
-		End If
-		rc = ovec.GetOutputList(listcount, ID, value)
-		value = AddVector(valueG, value)
-		For j = 0 To listcountG - 1 Step 1
-			If value(j) < 0 Then
-				rc = g2(i).Add(FT_ELEM, IDG(j))
-			End If
-		Next
-		rc = g2(i).Put(g2(i).NextEmptyID())
-		rc = gset.Add(g2(i).ID)
-	Loop
+    'Create the first temporary group: elements in compression in dead load alone.
+    rc = elemSet.Clear()
+    For i = 0 To listCount - 1
+        If deadValues(i) < 0# Then rc = elemSet.Add(elemIDs(i))
+    Next
+    gBase.ID = gBase.NextEmptyID()
+    gBase.title = "Temp compression - dead load"
+    rc = gBase.SetAdd(C_FT_ELEM, elemSet.ID)
+    rc = gBase.Put(gBase.ID)
+    If rc <> C_FE_OK Then
+        er = 3
+        GoTo Cleanup
+    End If
+    currentGroupID = gBase.ID
 
-'5
-	rc = App.feGroupBoolean2(gset.ID, 0, FGB_INALL, 0, "ELEMENTS IN COMPRESSION")
-	If rc <> -1 Then
-		er = 5
-		GoTo Cleanup
-	End If
+    '4. For each selected set, create the compression group for dead+selected
+    '   and intersect it with the running result using old feGroupBoolean(And).
+    rc = outSets.Reset()
+    For i = 0 To outSets.Count() - 1
+        outSetID = outSets.Next()
+        rc = outSet.Get(outSetID)
+        If rc <> C_FE_OK Then
+            er = 4
+            GoTo Cleanup
+        End If
+
+        outVec.setID = outSet.ID
+        rc = outVec.Get(3022)
+        If rc <> C_FE_OK Then
+            er = 4
+            GoTo Cleanup
+        End If
+
+        rc = elemSet.Clear()
+        For j = 0 To listCount - 1
+            If (deadValues(j) + outVec.Value(elemIDs(j))) < 0# Then
+                rc = elemSet.Add(elemIDs(j))
+            End If
+        Next
+
+        gTemp.ID = gTemp.NextEmptyID()
+        gTemp.title = "Temp compression - combination"
+        rc = gTemp.SetAdd(C_FT_ELEM, elemSet.ID)
+        rc = gTemp.Put(gTemp.ID)
+        If rc <> C_FE_OK Then
+            er = 4
+            GoTo Cleanup
+        End If
+        tempGroupID = gTemp.ID
+
+        nextGroupID = gResult.NextEmptyID()
+        rc = App.feGroupBoolean(0, currentGroupID, tempGroupID, nextGroupID, "Temp compression intersection")
+        If rc <> C_FE_OK Then
+            er = 5
+            GoTo Cleanup
+        End If
+
+        If currentGroupID <> gBase.ID Then Call App.feDelete(C_FT_GROUP, currentGroupID)
+        Call App.feDelete(C_FT_GROUP, tempGroupID)
+        currentGroupID = nextGroupID
+    Next
+
+    '5. Keep only the final intersection and give it the requested title.
+    If currentGroupID <> gBase.ID Then Call App.feDelete(C_FT_GROUP, gBase.ID)
+    rc = gResult.Get(currentGroupID)
+    If rc <> C_FE_OK Then
+        er = 5
+        GoTo Cleanup
+    End If
+    gResult.title = "ELEMENTS IN COMPRESSION"
+    rc = gResult.Put(currentGroupID)
+    If rc <> C_FE_OK Then er = 5
 
 Cleanup:
-	Call App.feAppMessage(FCM_NORMAL, "The script exited with code: " & er)
-	On Error Resume Next
-		For i = UBound(g2) To 0 Step -1
-			Set g2(i) = Nothing
-		Next
-		If Not DBUG Then Call App.feDelete(FT_GROUP, gset.ID)
-		Set g1 = Nothing
-		Set gset = Nothing
-		Set ovec = Nothing
-		Set ovecG = Nothing
-		Set oset = Nothing
-		Set osetG = Nothing
-		Set osets = Nothing
-		Set App = Nothing
+    If er <> 0 Then Call App.feAppMessage(C_FCM_NORMAL, "The script exited with code: " & er)
+    On Error Resume Next
+    Set gResult = Nothing
+    Set gTemp = Nothing
+    Set gBase = Nothing
+    Set elemSet = Nothing
+    Set outVec = Nothing
+    Set deadVec = Nothing
+    Set outSets = Nothing
+    Set outSet = Nothing
+    Set deadSet = Nothing
+    Set App = Nothing
 End Sub
-
-Private Function AddVector(ByRef A() As Double, ByRef B() As Double) As Variant
-	Dim C() As Double
-	Dim i As Long
-	If (LBound(A) = LBound(B)) And (UBound(A) = UBound(B)) Then
-		ReDim C(LBound(A) To UBound(A))
-		For i = LBound(A) To UBound(A) Step 1
-			C(i) = A(i) + B(i)
-		Next
-	Else
-		AddVector = 0
-		Exit Function
-	End If
-	AddVector = C
-End Function
-
-Private Function SubtractVector(ByRef A() As Double, ByRef B() As Double) As Variant
-	Dim C() As Double
-	Dim i As Long
-	If (LBound(A) = LBound(B)) And (UBound(A) = UBound(B)) Then
-		ReDim C(LBound(A) To UBound(A))
-		For i = LBound(A) To UBound(A) Step 1
-			C(i) = A(i) - B(i)
-		Next
-	Else
-		SubtractVector = 0
-		Exit Function
-	End If
-	SubtractVector = C
-End Function

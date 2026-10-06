@@ -1,214 +1,189 @@
-Option Explicit On
+' =============================================================================
+' Description: Creates a linearly varying distributed element load between
+'              user-defined values at the minimum and maximum global X of the
+'              selected elements.
+' Compatibility: Nastran for Windows 2004 and modern FEMAP.
+' =============================================================================
 
-Const DBUG As Boolean = False
-Private er As Long
-Private ldir As Long
+Option Explicit
 
-'load elements by function with variables x0, y0, z0, x1, y1, z1, A, L
+Const C_FE_OK As Long = -1
+Const C_FT_ELEM As Long = 8
+Const C_FCM_NORMAL As Long = 0
+
+Private gLoadDirection As Long
 
 Sub Main
-    Dim App As femap.model
-    Set App = feFemap()
-    Dim rc As Long, i As Long
-
-    er = 0
-
-    If Not DBUG Then On Error GoTo Cleanup
-
+    Dim App As Object
     Dim elset As Object
-    Set elset = App.feSet()
-
-    Dim el As Object
-    Set el = App.feElem()
-
-    Dim nd As Object
-    Set nd = App.feNode()
-
-    Dim vecn(8) As String
-    Dim v(8) As Double
-
-    Dim A0 As Double
-    Dim A1 As Double
-    Dim L As Double
-
-    vecn(0) = "X0"
-    vecn(1) = "Y0"
-    vecn(2) = "Z0"
-    vecn(3) = "X1"
-    vecn(4) = "Y1"
-    vecn(5) = "Z1"
-    vecn(6) = "A0"
-    vecn(7) = "A1"
-    vecn(8) = "L"
-
-    Dim load As Double
+    Dim elObj As Object
+    Dim ndObj As Object
     Dim ld As Object
+    Dim rc As Long
+    Dim i As Long
+    Dim dof(2) As Long
+    Dim vals(5) As Double
+    Dim func(4) As Long
+    Dim xMin As Double
+    Dim xMax As Double
+    Dim x0 As Double
+    Dim x1 As Double
+    Dim xMid As Double
+    Dim spanX As Double
+    Dim leftValue As Double
+    Dim rightValue As Double
+    Dim loadValue As Double
+    Dim firstElement As Boolean
+    Dim keepRunning As Boolean
+    Dim errNumber As Long
+    Dim errDescription As String
+
+    On Error GoTo Cleanup
+
+    Set App = feGetObject()
+    Set elset = App.feSet()
+    Set elObj = App.feElem()
+    Set ndObj = App.feNode()
     Set ld = App.feLoadMesh()
 
-    Dim DOF(2) As Long
-    DOF(0) =6
-    DOF(1) = 0
-    DOF(2) = 0
+    dof(1) = 0
+    dof(2) = 0
+    For i = 0 To 5
+        vals(i) = 0#
+    Next
+    For i = 0 To 4
+        func(i) = 0
+    Next
 
-	Dim vals(5) As Double
-	For i = 0 To 5 Step 1
-		vals(i) = 0
-	Next
-	Dim func(4) As Long
-	For i = 0 To 4 Step 1
-		func(i) = 0
-	Next
+    keepRunning = True
+    Do While keepRunning
+        rc = elset.Select(C_FT_ELEM, True, "Select elements to load:")
+        If (rc <> C_FE_OK) Or (elset.Count() < 1) Then
+            keepRunning = False
+        Else
+            firstElement = True
+            rc = elset.Reset()
+            Do While elset.Next() <> 0
+                rc = elObj.Get(elset.CurrentID())
+                If rc = C_FE_OK Then
+                    rc = ndObj.Get(elObj.Node(0))
+                    If rc = C_FE_OK Then x0 = ndObj.x
+                    rc = ndObj.Get(elObj.Node(1))
+                    If rc = C_FE_OK Then x1 = ndObj.x
 
-	Do
-	    rc = elset.Select(8, True, "Select elements to load:")
-		If (rc <> -1) Or (elset.Count() < 1) Then
-			er = 1
-			GoTo Cleanup
-		End If
+                    If firstElement Then
+                        xMin = x0
+                        xMax = x0
+                        firstElement = False
+                    End If
+                    If x0 < xMin Then xMin = x0
+                    If x1 < xMin Then xMin = x1
+                    If x0 > xMax Then xMax = x0
+                    If x1 > xMax Then xMax = x1
+                End If
+            Loop
 
-		Dim min As Double
-		Dim max As Double
-		Dim Length As Double
+            spanX = xMax - xMin
+            If Abs(spanX) <= 0.000000000001 Then
+                MsgBox "The selected elements have no measurable span in global X.", 48, "Linear Distributed Load"
+                keepRunning = False
+            ElseIf Not PromptNumber("Input the leftmost value of Load:", "Linear Distributed load", leftValue) Then
+                keepRunning = False
+            ElseIf Not PromptNumber("Input the rightmost value of Load:", "Linear Distributed load", rightValue) Then
+                keepRunning = False
+            Else
+                dof(0) = GetDirection()
+                If dof(0) = 0 Then
+                    keepRunning = False
+                Else
+                    rc = elset.Reset()
+                    Do While elset.Next() <> 0
+                        rc = elObj.Get(elset.CurrentID())
+                        If rc = C_FE_OK Then
+                            rc = ndObj.Get(elObj.Node(0))
+                            If rc = C_FE_OK Then x0 = ndObj.x
+                            rc = ndObj.Get(elObj.Node(1))
+                            If rc = C_FE_OK Then x1 = ndObj.x
 
-		rc = elset.Reset()
-		rc = el.Get(elset.First())
-		rc = nd.Get(el.Node(0))
-		max = nd.x
-		rc = nd.Get(el.Node(1))
-		min = nd.x
-
-		rc = elset.Reset()
-		Do While elset.Next() <> 0
-			rc = el.Get(elset.CurrentID())
-			rc = nd.Get(el.Node(0))
-			v(0) = nd.x
-			rc = nd.Get(el.Node(1))
-			v(3) = nd.x
-			If max < v(0) Then max = v(0)
-			If max < v(3) Then max = v(3)
-			If min > v(0) Then min = v(0)
-			If min > v(3) Then min = v(3)
-			rc = el.Length(L)
-			Length = Length + L
-		Loop
-
-		Dim val1 As String
-		Dim val2 As String
-
-		Do
-			val1 = InputBox("Input the leftmost value of Load:", "Linear Distributed load")
-			If val1 = "" Then GoTo Cleanup
-			If IsNumeric(val1) Then Exit Do
-		Loop
-
-		Do
-			val2 = InputBox("Input the rightmost value of Load:", "Linear Distributed load")
-			If val2 = "" Then GoTo Cleanup
-			If IsNumeric(val1) Then Exit Do
-		Loop
-
-
-		Dim eq As String, eq2 As String
-		eq = CDbl(val1) & "+" & (CDbl(val2) - CDbl(val1)) & "*((X1+X0)/2-" & min & ")/" & max - min
-		'eq = UCase(InputBox("Input the equation:" & vbLf & "variables: [x0,y0,z0] [x1,y1,z1] [A0,A1] [L]", "Load by equation"))
-		'If eq = "" Then
-		'	er = 2
-		'	GoTo Cleanup
-		'End If
-
-		DOF(0) = GetDirection()
-		If DOF(0) = 0 Then
-			er = 3
-			GoTo Cleanup
-		End If
-
-		rc = elset.Reset()
-		Do While elset.Next() <> 0
-			rc = el.Get(elset.CurrentID())
-			rc = nd.Get(el.Node(0))
-			v(0) = nd.x
-			v(1) = nd.y
-			v(2) = nd.z
-			rc = nd.Get(el.Node(1))
-			v(3) = nd.x
-			v(4) = nd.y
-			v(5) = nd.z
-			eq2 = eq
-			rc = el.Area(A0, A1)
-			v(6) = CDbl(A0)
-			v(7) = CDbl(A1)
-			rc = el.Length(L)
-			v(8) = CDbl(L)
-			For i = 0 To UBound(v) Step 1
-				If InStr(1, eq2, vecn(i)) <> 0 Then
-					eq2 = Replace(eq2, vecn(i), CStr(v(i)), 1,-1)
-				End If
-			Next
-			eq2 = Replace(eq2, ",", ".")
-			If DBUG Then
-				Debug.Print eq & " -> " & eq2 & " = " & Eval(eq2)
-			End If
-			load = CDbl(Eval(eq2))
-			vals(0) = load
-			vals(1) = load
-			rc = ld.Add(-el.ID, 41, 0, DOF, vals, func)
-			'Call App.feAppMessage(FCM_NORMAL, Eval(eq2))
-		Loop
-		Call App.feViewRegenerate(0)
-Loop
+                            xMid = (x0 + x1) / 2#
+                            loadValue = leftValue + (rightValue - leftValue) * ((xMid - xMin) / spanX)
+                            vals(0) = loadValue
+                            vals(1) = loadValue
+                            rc = ld.Add(-elObj.ID, 41, 0, dof, vals, func)
+                        End If
+                    Loop
+                    Call App.feViewRegenerate(0)
+                End If
+            End If
+        End If
+    Loop
 
 Cleanup:
-	Call App.feAppMessage(FCM_NORMAL, "The script exited with code: " & er)
-	On Error Resume Next
-	Set ld = Nothing
-	Set nd = Nothing
-	Set el = Nothing
-	Set elset = Nothing
-	Set App = Nothing
+    errNumber = Err.Number
+    errDescription = Err.Description
+
+    On Error Resume Next
+    If errNumber <> 0 Then
+        If Len(errDescription) > 120 Then errDescription = Left$(errDescription, 120)
+        If Not App Is Nothing Then Call App.feAppMessage(3, "PARS load error " & CStr(errNumber) & ": " & errDescription)
+    End If
+    Set ld = Nothing
+    Set ndObj = Nothing
+    Set elObj = Nothing
+    Set elset = Nothing
+    Set App = Nothing
+    On Error GoTo 0
 End Sub
 
-Private Function GetDirection() As Long
-	Dim rc As Long
-	ldir = 0
+Private Function PromptNumber(promptText As String, dialogTitle As String, ByRef valueOut As Double) As Boolean
+    Dim answer As String
 
-	Begin Dialog UserDialog 320,91,"Get Load Direction",.loaddir ' %GRID:10,7,1,1
-		GroupBox 10,7,210,84,"Direction",.GroupBox1
-		OptionGroup .Group1
-			OptionButton 20,28,90,14,"Element X",.Ex
-			OptionButton 20,49,90,14,"Element Y",.Ey
-			OptionButton 20,70,90,14,"Element Z",.Ez
-			OptionButton 130,28,90,14,"Global X",.Gx
-			OptionButton 130,49,90,14,"Global Y",.Gy
-			OptionButton 130,70,90,14,"Global Z",.Gz
-		OKButton 230,14,90,21
-		CancelButton 230,42,90,21
-	End Dialog
-	Dim dlg As UserDialog
-	dlg.Group1 = 5
-	rc = Dialog(dlg)
-
-	GetDirection = ldir
+    PromptNumber = False
+    Do
+        answer = InputBox(promptText, dialogTitle)
+        If answer = "" Then Exit Function
+        If IsNumeric(answer) Then
+            valueOut = CDbl(answer)
+            PromptNumber = True
+            Exit Function
+        End If
+        MsgBox "Please enter a numeric value.", 48, dialogTitle
+    Loop
 End Function
 
-Rem See DialogFunc help topic for more information.
-Private Function loaddir(DlgItem$, Action%, SuppValue?) As Boolean
-	Select Case Action%
-	Case 1 ' Dialog box initialization
-	Case 2 ' Value changing or button pressed
-		Rem loaddir = True ' Prevent button press from closing the dialog box
-		loaddir = True
-		Select Case DlgItem$
-		Case "OK"
-			ldir = DlgValue("Group1") + 1
-			loaddir = False
-		Case "Cancel"
-			ldir = 0
-			loaddir = False
-		End Select
-	Case 3 ' TextBox or ComboBox text changed
-	Case 4 ' Focus changed
-	Case 5 ' Idle
-		Rem Wait .1 : loaddir = True ' Continue getting idle actions
-	Case 6 ' Function key
-	End Select
+Private Function GetDirection() As Long
+    Begin Dialog UserDialog 320,91,"Get Load Direction",.LoadDirectionDialog ' %GRID:10,7,1,1
+        GroupBox 10,7,210,84,"Direction",.GroupBox1
+        OptionGroup .Group1
+            OptionButton 20,28,90,14,"Element X",.Ex
+            OptionButton 20,49,90,14,"Element Y",.Ey
+            OptionButton 20,70,90,14,"Element Z",.Ez
+            OptionButton 130,28,90,14,"Global X",.Gx
+            OptionButton 130,49,90,14,"Global Y",.Gy
+            OptionButton 130,70,90,14,"Global Z",.Gz
+        OKButton 230,14,90,21
+        CancelButton 230,42,90,21
+    End Dialog
+    Dim dlg As UserDialog
+
+    gLoadDirection = 0
+    dlg.Group1 = 5
+    If Dialog(dlg) = 0 Then gLoadDirection = 0
+    GetDirection = gLoadDirection
+End Function
+
+Private Function LoadDirectionDialog(DlgItem, Action, SuppValue) As Boolean
+    LoadDirectionDialog = True
+
+    Select Case Action
+    Case 2
+        Select Case DlgItem
+        Case "OK"
+            gLoadDirection = DlgValue("Group1") + 1
+            LoadDirectionDialog = False
+        Case "Cancel", "Esc"
+            gLoadDirection = 0
+            LoadDirectionDialog = False
+        End Select
+    End Select
 End Function

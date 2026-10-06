@@ -1,9 +1,21 @@
-Option Explicit On
+' =============================================================================
+' Description: Creates groups from selected output data and displays the generated group.
+' Compatibility: Nastran for Windows 2004 and modern FEMAP.
+' =============================================================================
+
+Option Explicit
 'Creates a Group of Elements based on their Output Value (either Nodal or Elemental).
 'Selects the elements according to the input criteria - lower than limit, higher than limit,
 'between limit values or out of limit values.
 
 Const DBUG As Boolean = False
+Const C_FE_OK As Long = -1
+Const C_FT_NODE As Long = 7
+Const C_FT_ELEM As Long = 8
+Const C_FT_OUT_CASE As Long = 28
+Const C_FT_OUT_DIR As Long = 29
+Const C_FGD_ELEM_BYNODE As Long = 25
+Const C_FCM_NORMAL As Long = 0
 Private er As Long
 Private maxval As Double
 Private minval As Double
@@ -14,8 +26,8 @@ Private uvalp As Double
 Private state As Long
 
 Sub Main
-    Dim App As femap.model
-    Set App = feFemap()
+    Dim App As Object
+    Set App = feGetObject()
     Dim rc As Long, i As Long
 
     er = -1
@@ -43,9 +55,9 @@ Sub Main
 
 	rc = v.Get(1)
 
-	If oset.Get(v.OutputSet) <> -1 Then
-		rc = s.SelectID(FT_OUT_CASE, "Select OutputSet for script:", osetID)
-		If rc <> -1 Then
+	If oset.Get(v.OutputSet) <> C_FE_OK Then
+		rc = s.SelectID(C_FT_OUT_CASE, "Select OutputSet for script:", osetID)
+		If rc <> C_FE_OK Then
 			er = 0
 			GoTo Cleanup
 		End If
@@ -54,22 +66,24 @@ Sub Main
 	End If
     rc = oset.Get(osetID)
     rc = s.Clear()
-    Call App.feAppMessage(FCM_NORMAL, "Selected Output Set: " & osetID)
+    Call App.feAppMessage(C_FCM_NORMAL, "Selected Output Set: " & osetID)
 
-    'rc = s.SelectOutputVectorID("Select OutputVector For script:", osetID, 0, 4, 0, True, ovecID)
-    'Set ovec = oset.Vector(0)
-	If (ovec.GetFromSet(oset.ID, v.ContourData) <> -1) Or (ovec.ID = 0) Then
-		rc = s.SelectOutputVectorID("Select OutputVector For script:", osetID, 0, 4, 0, True, ovecID)
-		If rc <> -1 Then
+	oset.Active = osetID
+	ovecID = v.ContourData
+	If ovecID > 0 Then rc = ovec.Get(ovecID)
+	If (ovecID <= 0) Or (rc <> C_FE_OK) Then
+		rc = s.SelectID(C_FT_OUT_DIR, "Select Output Vector for script:", ovecID)
+		If rc <> C_FE_OK Then
 			er = 0
 			GoTo Cleanup
 		End If
-	Else
-		ovecID = v.ContourData
+		rc = ovec.Get(ovecID)
+		If rc <> C_FE_OK Then
+			er = 0
+			GoTo Cleanup
+		End If
 	End If
-
-	rc = ovec.Get(ovecID)
-	Call App.feAppMessage(FCM_NORMAL, "Selected Output Vector: " & ovecID)
+	Call App.feAppMessage(C_FCM_NORMAL, "Selected Output Vector: " & ovecID)
 
 	minval = ovec.minval()
 	maxval = ovec.maxval()
@@ -105,8 +119,7 @@ Sub Main
 	dlg.pc = 1
 	dlg.LBnd = Format$(lvalp, "0.00")
 	dlg.UBnd = Format$(uvalp, "0.00")
-	rc = Dialog(dlg)
-	If rc <> -1 Then
+	If Dialog(dlg) <> C_FE_OK Then
 		er = 1
 		GoTo Cleanup
 	End If
@@ -125,13 +138,13 @@ Sub Main
 		firstID = n.ID()
 		rc = n.Last()
 		lastID = n.ID()
-		rc = neset.AddAll(FT_NODE)
+		rc = neset.AddAll(C_FT_NODE)
 	Case 8
 		rc = e.First()
 		firstID = e.ID()
 		rc = e.Last()
 		lastID = e.ID()
-		rc = neset.AddAll(FT_ELEM)
+		rc = neset.AddAll(C_FT_ELEM)
 	End Select
 
 	rc = neset.Reset()
@@ -143,14 +156,14 @@ Sub Main
 		Case 7
 			For i = 0 To neset.Count() - 1 Step 1
 				rc = neset.Next()
-				If rc <> -1 Then
-					If (ovec.Value(rc) <= uval) Then rc = s.AddRule(rc, FGD_ELEM_BYNODE)
+				If rc <> C_FE_OK Then
+					If (ovec.Value(rc) <= uval) Then rc = s.AddRule(rc, C_FGD_ELEM_BYNODE)
 				End If
 			Next
 		Case 8
 			For i = 0 To neset.Count() - 1 Step 1
 				rc = neset.Next()
-				If rc <> -1 Then
+				If rc <> C_FE_OK Then
 					If (ovec.Value(rc) <= uval) Then rc = s.Add(rc)
 				End If
 			Next
@@ -160,14 +173,14 @@ Sub Main
 		Case 7
 			For i = 0 To neset.Count() - 1 Step 1
 				rc = neset.Next()
-				If rc <> -1 Then
-					If (ovec.Value(rc) >= lval) And (ovec.Value(rc) <= uval) Then rc = s.AddRule(rc, FGD_ELEM_BYNODE)
+				If rc <> C_FE_OK Then
+					If (ovec.Value(rc) >= lval) And (ovec.Value(rc) <= uval) Then rc = s.AddRule(rc, C_FGD_ELEM_BYNODE)
 				End If
 			Next
 		Case 8
 			For i = 0 To neset.Count() - 1 Step 1
 				rc = neset.Next()
-				If rc <> -1 Then
+				If rc <> C_FE_OK Then
 					If (ovec.Value(rc) >= lval) And (ovec.Value(rc) <= uval) Then rc = s.Add(rc)
 				End If
 			Next
@@ -177,14 +190,14 @@ Sub Main
 		Case 7
 			For i = 0 To neset.Count() - 1 Step 1
 				rc = neset.Next()
-				If rc <> -1 Then
-					If (ovec.Value(rc) >= lval) Then rc = s.AddRule(rc, FGD_ELEM_BYNODE)
+				If rc <> C_FE_OK Then
+					If (ovec.Value(rc) >= lval) Then rc = s.AddRule(rc, C_FGD_ELEM_BYNODE)
 				End If
 			Next
 		Case 8
 			For i = 0 To neset.Count() - 1 Step 1
 				rc = neset.Next()
-				If rc <> -1 Then
+				If rc <> C_FE_OK Then
 					If (ovec.Value(rc) >= lval) Then rc = s.Add(rc)
 				End If
 			Next
@@ -194,21 +207,21 @@ Sub Main
 		Case 7
 			For i = 0 To neset.Count() - 1 Step 1
 				rc = neset.Next()
-				If rc <> -1 Then
-					If (ovec.Value(rc) <= lval) Or (ovec.Value(rc) >= uval) Then rc = s.AddRule(rc, FGD_ELEM_BYNODE)
+				If rc <> C_FE_OK Then
+					If (ovec.Value(rc) <= lval) Or (ovec.Value(rc) >= uval) Then rc = s.AddRule(rc, C_FGD_ELEM_BYNODE)
 				End If
 			Next
 		Case 8
 			For i = 0 To neset.Count() - 1 Step 1
 				rc = neset.Next()
-				If rc <> -1 Then
+				If rc <> C_FE_OK Then
 					If (ovec.Value(rc) <= lval) Or (ovec.Value(rc) >= uval) Then rc = s.Add(rc)
 				End If
 			Next
 		End Select
 	End Select
 
-	rc = g.SetAdd(FT_ELEM, s.ID)
+	rc = g.SetAdd(C_FT_ELEM, s.ID)
 	Dim txt As String
 	Select Case state
 	Case 0
@@ -222,18 +235,18 @@ Sub Main
 	End Select
 	g.title = ovec.title & txt
 	rc = g.Put(g.ID)
-	If rc <> -1 Then
+	If rc <> C_FE_OK Then
 		er = 2
 		GoTo Cleanup
 	End If
 
-	rc = v.SetMultiGroupList(True, 1, Array(g.ID))
+	v.Group = g.ID
 	rc = v.Put(v.ID)
 	rc = v.Regenerate()
 
 	er = 0
 Cleanup:
-	Call App.feAppMessage(FCM_NORMAL, "The script exited with code: " & er)
+	Call App.feAppMessage(C_FCM_NORMAL, "The script exited with code: " & er)
 	On Error Resume Next
 	Set neset = Nothing
 	Set n = Nothing

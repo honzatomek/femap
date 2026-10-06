@@ -1,53 +1,54 @@
-Attribute VB_Name = "Module2"
+' =============================================================================
+' Description: Sets all six DOFs active at the dependent/reference node of selected RBE3 elements.
+' Compatibility: Nastran for Windows 2004 and modern FEMAP.
+' =============================================================================
+
 Option Explicit
 
-Sub Main
-	Dim App As femap.model
-    Set App = feFemap()
-    Dim rc As Long
+' Sets all six dependent/reference-node DOFs active for selected RBE3 elements.
 
-    On Error GoTo ExitHere
+Const C_FE_OK As Long = -1
+Const C_FT_ELEM As Long = 8
+Const C_FET_RIGID As Long = 29
+Const C_FTO_RIGID As Long = 13
+
+Sub Main
+    Dim App As Object
+    Set App = feGetObject()
 
     Dim elset As Object
-    Set elset = App.feSet()
     Dim el As Object
-    Set el = App.feElem()
     Dim elID As Long
-    Dim tmp As Variant
-    Dim thexp As Double
+    Dim rc As Long
+    Dim i As Long
 
-	rc = elset.Select(8, True, "Select Rigid elements (RBE3)")
-	If rc <> -1 Then GoTo ExitHere
-	rc = elset.Reset()
+    Set elset = App.feSet()
+    Set el = App.feElem()
 
-	'tmp = InputBox("Input new Thermal Expansion Coefficient", "RBE2 Thermal Update", "1.2e-05")
-	'If tmp = "" Then GoTo ExitHere
+    On Error GoTo ErrorHandler
 
-	'If InStr(1, tmp, ".") <> 0 Then tmp = Replace(tmp, ".", ",")
-	'thexp = CDbl(tmp)
+    rc = elset.Select(C_FT_ELEM, True, "Select RBE3 elements:")
+    If rc <> C_FE_OK Then GoTo ExitHere
 
-	elID = elset.Next()
+    rc = elset.Reset()
+    elID = elset.Next()
+    Do While elID <> 0
+        rc = el.Get(elID)
+        If (rc = C_FE_OK) And (el.type = C_FET_RIGID) And (el.topology = C_FTO_RIGID) And el.RigidInterpolate Then
+            For i = 0 To 5
+                el.release(0, i) = 1
+            Next
+            rc = el.Put(el.ID)
+        End If
+        elID = elset.Next()
+    Loop
+    GoTo ExitHere
 
-	Do While elID <> 0
-		rc = el.Get(elID)
-		If (el.type = 29) And (el.topology = 13) And (el.RigidInterpolate) Then ' (Not el.RigidInterpolate)
-			'Debug.Print el.ID
-			'el.RigidThermalExpansion = thexp
-			el.release(0, 0) = 1
-			el.release(0, 1) = 1
-			el.release(0, 2) = 1
-			el.release(0, 3) = 1
-			el.release(0, 4) = 1
-			el.release(0, 5) = 1
-			rc = el.Put(el.ID)
-		End If
-
-		elID = elset.Next()
-	Loop
+ErrorHandler:
+    MsgBox "Error " & CStr(Err.Number) & ": " & Err.Description
 
 ExitHere:
-	On Error Resume Next
-	Set el = Nothing
-	Set elset = Nothing
-	Set App = Nothing
+    Set el = Nothing
+    Set elset = Nothing
+    Set App = Nothing
 End Sub

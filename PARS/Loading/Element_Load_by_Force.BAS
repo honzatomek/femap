@@ -1,11 +1,17 @@
-Option Explicit On
+' =============================================================================
+' Description: Creates element loads by distributing a specified resultant force over selected elements.
+' Compatibility: Nastran for Windows 2004 and modern FEMAP.
+' =============================================================================
+
+Option Explicit
 
 Const DBUG As Boolean = False
+Const C_FCM_NORMAL As Long = 0
 Private er As Long
 
 Sub Main
-    Dim App As femap.model
-    Set App = feFemap()
+    Dim App As Object
+    Set App = feGetObject()
     Dim rc As Long, i As Long
 
     er = 0
@@ -48,7 +54,7 @@ Sub Main
 	Do
 		eq = InputBox("Input the summed load:", "Load by summed force")
 		If eq = "" Then GoTo Cleanup
-		If InStr(1, ".", ",") <> 0 Then eq = Replace(eq, ".", ",")
+		If InStr(1, eq, ".") <> 0 Then eq = Replace(eq, ".", ",")
 		If IsNumeric(eq) Then Exit Do
 	Loop
 	eq2 = CDbl(eq)
@@ -75,7 +81,7 @@ Sub Main
 	Loop
 
 Cleanup:
-	Call App.feAppMessage(FCM_NORMAL, "The script exited with code: " & er)
+	Call App.feAppMessage(C_FCM_NORMAL, "The script exited with code: " & er)
 	On Error Resume Next
 	Set ld = Nothing
 	Set el = Nothing

@@ -1,287 +1,283 @@
+' =============================================================================
+' Description: Backup/test copy of the PARS math helper functions.
+' Compatibility: Modern FEMAP BASIC only; uses Eval() and Optional arguments unavailable/unverified in N4W 8.3.
+' =============================================================================
+
 Option Explicit On
 
-Const DBUG As Boolean = True
-Private er As Long
+Const C_FCM_NORMAL As Long = 0
 
 Sub Main
-    Dim App As femap.model
-    Set App = feFemap()
-    Dim rc As Long, i As Long
-
-    er = 0
-
-    If Not DBUG Then On Error GoTo Cleanup
-
+    Dim App As Object
     Dim t(2) As Double
 
-	t(0) = 0
-	t(1) = 1
-	t(2) = 10
+    Set App = feGetObject()
+    t(0) = 0#
+    t(1) = 1#
+    t(2) = 10#
 
-    Debug.Print Max(t)
-
-	Debug.Print Max(1, 3, t)
+    'Scalar argument tests are valid on both old and modern hosts.
+    Debug.Print Max(1#, 3#, 10#)
+    Debug.Print MaxAbs(1#, -2#, 5#, 6#, 8#, -110#)
     Debug.Print Eval("Abs(-10)")
 
-Cleanup:
-	Call App.feAppMessage(FCM_NORMAL, "The script exited with code: " & er)
-	On Error Resume Next
-	Set App = Nothing
+    Call App.feAppMessage(C_FCM_NORMAL, "Math backup test complete.")
+    Set App = Nothing
 End Sub
 
-'Ludolfs number pi
-Private Function pi() As Double
-	'pi = 52163/16604
-	pi = 3.14159265358979323846264338327950288419716939937510
+Public Function pi() As Double
+    pi = 3.14159265358979323846
 End Function
 
-'Eulers number
-Private Function e() As Double
-	e = 2.71828182845904523536028747135266249775724709369995
+Public Function e() As Double
+    e = 2.71828182845904523536
 End Function
 
-'Logarithm of x with the base a
-Private Function LogA(ByVal x As Double, Optional ByVal a As Double = 10) As Double
-	LogA = Log(x)/Log(a)
+Public Function LogA(ByVal x As Double, Optional ByVal a As Double = 10) As Double
+    LogA = Log(x) / Log(a)
 End Function
 
-'Logarithm of x with the base 10
-Private Function Log10(ByVal x As Double) As Double
-	Log10 = Log(x)/Log(10)
+Public Function Log10(ByVal x As Double) As Double
+    Log10 = Log(x) / Log(10)
 End Function
 
-'Logarithm of x with the base e = 2,718
-Private Function LogN(ByVal x As Double) As Double
-	LogN = Log(x)
+Public Function LogN(ByVal x As Double) As Double
+    LogN = Log(x)
 End Function
 
-'Tangent x
-Private Function tg(ByVal x As Double) As Double
-	tg = Sin(x)/Cos(x)
+Public Function tg(ByVal x As Double) As Double
+    tg = Sin(x) / Cos(x)
 End Function
 
-'Cotangent x
-Private Function cotg(ByVal x As Double) As Double
-	cotg = Cos(x)/Sin(x)
+Public Function cotg(ByVal x As Double) As Double
+    cotg = Cos(x) / Sin(x)
 End Function
 
-'Inverse sine x
-Private Function arcsin(ByVal x As Double) As Double
-	arcsin = Atn(x/Sqr(-x*x+1))
+Public Function arcsin(ByVal x As Double) As Double
+    arcsin = Atn(x / Sqr(-x * x + 1))
 End Function
 
-'Inverse cosine x
-Private Function arccos(ByVal x As Double) As Double
-	arccos = Atn(-x/Sqr(-x*x+1))+2*Atn(1)
+Public Function arccos(ByVal x As Double) As Double
+    arccos = Atn(-x / Sqr(-x * x + 1)) + 2 * Atn(1)
 End Function
 
-'Inverse tangent x
-Private Function arctg(ByVal x As Double) As Double
-	arctg = Atn(x)
+Public Function arctg(ByVal x As Double) As Double
+    arctg = Atn(x)
 End Function
 
-'Inverse cotangent x
-Private Function arccotg(ByVal x As Double) As Double
-	arccotg = 2 * Atn(1) - Atn(x)
+Public Function arccotg(ByVal x As Double) As Double
+    arccotg = 2 * Atn(1) - Atn(x)
 End Function
 
-'Angle between x axis and point (x,y) in 2D
-Private Function ArcTg2(ByVal x As Double, ByVal y As Double) As Double
+Public Function ArcTg2(ByVal x As Double, ByVal y As Double) As Double
     Select Case x
-        Case Is > 0
-            ArcTg2 = Atn(y / x)
-        Case Is < 0
-            ArcTg2 = Atn(y / x) + pi() * Sgn(y)
-            If y = 0 Then ArcTg2 = ArcTg2 + pi()
-        Case Is = 0
-            ArcTg2 = pi()/2 * Sgn(y)
+    Case Is > 0
+        ArcTg2 = Atn(y / x)
+    Case Is < 0
+        ArcTg2 = Atn(y / x) + pi() * Sgn(y)
+        If y = 0 Then ArcTg2 = ArcTg2 + pi()
+    Case Else
+        ArcTg2 = pi() / 2 * Sgn(y)
     End Select
 End Function
 
-'Secant x
-Private Function sec(ByVal x As Double) As Double
-	sec = 1/Cos(x)
+Public Function sec(ByVal x As Double) As Double
+    sec = 1 / Cos(x)
 End Function
 
-'Cosecant x
-Private Function cosec(ByVal x As Double) As Double
-	cosec = 1/Sin(x)
+Public Function cosec(ByVal x As Double) As Double
+    cosec = 1 / Sin(x)
 End Function
 
-'Inverse secant x
-Private Function arcsec(ByVal x As Double) As Double
-	arcsec = 2*Atn(1) - Atn(Sgn(x)/Sqr(x*x - 1))
+Public Function arcsec(ByVal x As Double) As Double
+    arcsec = 2 * Atn(1) - Atn(Sgn(x) / Sqr(x * x - 1))
 End Function
 
-'Inverse cosecant x
-Private Function arccosec(ByVal x As Double) As Double
-	arccosec = Atn(Sgn(x)/Sqr(x*x-1))
+Public Function arccosec(ByVal x As Double) As Double
+    arccosec = Atn(Sgn(x) / Sqr(x * x - 1))
 End Function
 
-'Hyperbolic sine x
-Private Function hsin(ByVal x As Double) As Double
-	hsin = (Exp(x)-Exp(-x))/2
+Public Function hsin(ByVal x As Double) As Double
+    hsin = (Exp(x) - Exp(-x)) / 2
 End Function
 
-'Hyperbolic cosine x
-Private Function hcos(ByVal x As Double) As Double
-	hcos = (Exp(x) + Exp(-x)) / 2
+Public Function hcos(ByVal x As Double) As Double
+    hcos = (Exp(x) + Exp(-x)) / 2
 End Function
 
-'Hyperbolic tangent x
-Private Function htg(ByVal x As Double) As Double
-	htg = (Exp(x) - Exp(-x)) / (Exp(x) + Exp(-x))
+Public Function htg(ByVal x As Double) As Double
+    htg = (Exp(x) - Exp(-x)) / (Exp(x) + Exp(-x))
 End Function
 
-'Hyperbolic cotangent x
-Private Function hcotg(ByVal x As Double) As Double
-	hcotg = (Exp(x) + Exp(-x)) / (Exp(x) - Exp(-x))
+Public Function hcotg(ByVal x As Double) As Double
+    hcotg = (Exp(x) + Exp(-x)) / (Exp(x) - Exp(-x))
 End Function
 
-'Hyperbolic secant x
-Private Function hsec(ByVal x As Double) As Double
-	hsec = 2 / (Exp(x) + Exp(-x))
+Public Function hsec(ByVal x As Double) As Double
+    hsec = 2 / (Exp(x) + Exp(-x))
 End Function
 
-'Hyperbolic cosecant x
-Private Function hcosec(ByVal x As Double) As Double
-	hcosec = 2 / (Exp(x) - Exp(-x))
+Public Function hcosec(ByVal x As Double) As Double
+    hcosec = 2 / (Exp(x) - Exp(-x))
 End Function
 
-'Inverse hyperbolix sine x
-Private Function harcsin(ByVal x As Double) As Double
-	harcsin = Log(x + Sqr(x * x + 1))
+Public Function harcsin(ByVal x As Double) As Double
+    harcsin = Log(x + Sqr(x * x + 1))
 End Function
 
-'Inverse hyperbolix cosine x
-Private Function harccos(ByVal x As Double) As Double
-	harccos = Log(x + Sqr(x * x - 1))
+Public Function harccos(ByVal x As Double) As Double
+    harccos = Log(x + Sqr(x * x - 1))
 End Function
 
-'Inverse hyperbolix tangent x
-Private Function harctg(ByVal x As Double) As Double
-	harctg = Log((1 + x) / (1 - x)) / 2
+Public Function harctg(ByVal x As Double) As Double
+    harctg = Log((1 + x) / (1 - x)) / 2
 End Function
 
-'Inverse hyperbolix cotangent x
-Private Function harccotg(ByVal x As Double) As Double
-	harccotg = Log((x+1)/(x-1))/2
+Public Function harccotg(ByVal x As Double) As Double
+    harccotg = Log((x + 1) / (x - 1)) / 2
 End Function
 
-'Inverse hyperbolix secant x
-Private Function harcsec(ByVal x As Double) As Double
-	harcsec = Log((Sqr(-x * x + 1) + 1) / x)
+Public Function harcsec(ByVal x As Double) As Double
+    harcsec = Log((Sqr(-x * x + 1) + 1) / x)
 End Function
 
-'Inverse hyperbolix cosecant x
-Private Function harccosec(ByVal x As Double) As Double
-	harccosec = Log((Sgn(x) * Sqr(x * x + 1) + 1) / x)
+Public Function harccosec(ByVal x As Double) As Double
+    harccosec = Log((Sgn(x) * Sqr(x * x + 1) + 1) / x)
 End Function
 
-'Maximum of values, max 12 variables
-Private Function Max(ByVal a As Variant, Optional ByVal b As Variant, Optional ByVal c As Variant, Optional ByVal d As Variant, Optional ByVal e As Variant, Optional ByVal f As Variant, Optional ByVal g As Variant, Optional ByVal h As Variant, Optional ByVal i As Variant, Optional ByVal j As Variant, Optional ByVal k As Variant, Optional ByVal l As Variant) As Double
-	Dim tmp() As Double
-	Dim t As Double
-	Dim temp As Variant
-	Dim z As Long
-	temp = Array(a,b,c,d,e,f,g,h,i,j,k,l)
-	tmp = EvalArgs(temp)
-
-	t = tmp(0)
-	For z = 1 To UBound(tmp) Step 1
-		If tmp(z) > t Then t = tmp(z)
-	Next
-
-	Max = t
+Public Function Max(ByVal a As Variant, Optional ByVal b As Variant, Optional ByVal c As Variant, Optional ByVal d As Variant, Optional ByVal e As Variant, Optional ByVal f As Variant, Optional ByVal g As Variant, Optional ByVal h As Variant, Optional ByVal i As Variant, Optional ByVal j As Variant, Optional ByVal k As Variant, Optional ByVal l As Variant) As Double
+    Dim tmp() As Double
+    Dim n As Long
+    Dim z As Long
+    n = 0
+    Call AppendEvalArg(a, tmp, n)
+    If Not IsMissing(b) Then Call AppendEvalArg(b, tmp, n)
+    If Not IsMissing(c) Then Call AppendEvalArg(c, tmp, n)
+    If Not IsMissing(d) Then Call AppendEvalArg(d, tmp, n)
+    If Not IsMissing(e) Then Call AppendEvalArg(e, tmp, n)
+    If Not IsMissing(f) Then Call AppendEvalArg(f, tmp, n)
+    If Not IsMissing(g) Then Call AppendEvalArg(g, tmp, n)
+    If Not IsMissing(h) Then Call AppendEvalArg(h, tmp, n)
+    If Not IsMissing(i) Then Call AppendEvalArg(i, tmp, n)
+    If Not IsMissing(j) Then Call AppendEvalArg(j, tmp, n)
+    If Not IsMissing(k) Then Call AppendEvalArg(k, tmp, n)
+    If Not IsMissing(l) Then Call AppendEvalArg(l, tmp, n)
+    Max = tmp(0)
+    For z = 1 To n - 1
+        If tmp(z) > Max Then Max = tmp(z)
+    Next
 End Function
 
-'Minimum of values, max 12 variables
-Private Function Min(ByVal a As Variant, Optional ByVal b As Variant, Optional ByVal c As Variant, Optional ByVal d As Variant, Optional ByVal e As Variant, Optional ByVal f As Variant, Optional ByVal g As Variant, Optional ByVal h As Variant, Optional ByVal i As Variant, Optional ByVal j As Variant, Optional ByVal k As Variant, Optional ByVal l As Variant) As Double
-	Dim tmp() As Double
-	Dim t As Double
-	Dim temp As Variant
-	Dim z As Long
-	temp = Array(a,b,c,d,e,f,g,h,i,j,k,l)
-	tmp = EvalArgs(temp)
-
-	t = tmp(0)
-	For z = 1 To UBound(tmp) Step 1
-		If tmp(z) < t Then t = tmp(z)
-	Next
-
-	Min = t
+Public Function Min(ByVal a As Variant, Optional ByVal b As Variant, Optional ByVal c As Variant, Optional ByVal d As Variant, Optional ByVal e As Variant, Optional ByVal f As Variant, Optional ByVal g As Variant, Optional ByVal h As Variant, Optional ByVal i As Variant, Optional ByVal j As Variant, Optional ByVal k As Variant, Optional ByVal l As Variant) As Double
+    Dim tmp() As Double
+    Dim n As Long
+    Dim z As Long
+    n = 0
+    Call AppendEvalArg(a, tmp, n)
+    If Not IsMissing(b) Then Call AppendEvalArg(b, tmp, n)
+    If Not IsMissing(c) Then Call AppendEvalArg(c, tmp, n)
+    If Not IsMissing(d) Then Call AppendEvalArg(d, tmp, n)
+    If Not IsMissing(e) Then Call AppendEvalArg(e, tmp, n)
+    If Not IsMissing(f) Then Call AppendEvalArg(f, tmp, n)
+    If Not IsMissing(g) Then Call AppendEvalArg(g, tmp, n)
+    If Not IsMissing(h) Then Call AppendEvalArg(h, tmp, n)
+    If Not IsMissing(i) Then Call AppendEvalArg(i, tmp, n)
+    If Not IsMissing(j) Then Call AppendEvalArg(j, tmp, n)
+    If Not IsMissing(k) Then Call AppendEvalArg(k, tmp, n)
+    If Not IsMissing(l) Then Call AppendEvalArg(l, tmp, n)
+    Min = tmp(0)
+    For z = 1 To n - 1
+        If tmp(z) < Min Then Min = tmp(z)
+    Next
 End Function
 
-'Maximum distance from 0 of a set of values, max 12 variables
-Private Function MaxAbs(ByVal a As Variant, Optional ByVal b As Variant, Optional ByVal c As Variant, Optional ByVal d As Variant, Optional ByVal e As Variant, Optional ByVal f As Variant, Optional ByVal g As Variant, Optional ByVal h As Variant, Optional ByVal i As Variant, Optional ByVal j As Variant, Optional ByVal k As Variant, Optional ByVal l As Variant) As Double
-	Dim tmp() As Double
-	Dim t As Double
-	Dim temp As Variant
-	Dim z As Long
-	temp = Array(a,b,c,d,e,f,g,h,i,j,k,l)
-	tmp = EvalArgs(temp)
-
-	t = tmp(0)
-	For z = 1 To UBound(tmp) Step 1
-		If Abs(tmp(z)) > Abs(t) Then t = tmp(z)
-	Next
-
-	MaxAbs = t
+Public Function MaxAbs(ByVal a As Variant, Optional ByVal b As Variant, Optional ByVal c As Variant, Optional ByVal d As Variant, Optional ByVal e As Variant, Optional ByVal f As Variant, Optional ByVal g As Variant, Optional ByVal h As Variant, Optional ByVal i As Variant, Optional ByVal j As Variant, Optional ByVal k As Variant, Optional ByVal l As Variant) As Double
+    Dim tmp() As Double
+    Dim n As Long
+    Dim z As Long
+    n = 0
+    Call AppendEvalArg(a, tmp, n)
+    If Not IsMissing(b) Then Call AppendEvalArg(b, tmp, n)
+    If Not IsMissing(c) Then Call AppendEvalArg(c, tmp, n)
+    If Not IsMissing(d) Then Call AppendEvalArg(d, tmp, n)
+    If Not IsMissing(e) Then Call AppendEvalArg(e, tmp, n)
+    If Not IsMissing(f) Then Call AppendEvalArg(f, tmp, n)
+    If Not IsMissing(g) Then Call AppendEvalArg(g, tmp, n)
+    If Not IsMissing(h) Then Call AppendEvalArg(h, tmp, n)
+    If Not IsMissing(i) Then Call AppendEvalArg(i, tmp, n)
+    If Not IsMissing(j) Then Call AppendEvalArg(j, tmp, n)
+    If Not IsMissing(k) Then Call AppendEvalArg(k, tmp, n)
+    If Not IsMissing(l) Then Call AppendEvalArg(l, tmp, n)
+    MaxAbs = tmp(0)
+    For z = 1 To n - 1
+        If Abs(tmp(z)) > Abs(MaxAbs) Then MaxAbs = tmp(z)
+    Next
 End Function
 
-'Sum of values
-Private Function Sum(ByVal a As Variant, Optional ByVal b As Variant, Optional ByVal c As Variant, Optional ByVal d As Variant, Optional ByVal e As Variant, Optional ByVal f As Variant, Optional ByVal g As Variant, Optional ByVal h As Variant, Optional ByVal i As Variant, Optional ByVal j As Variant, Optional ByVal k As Variant, Optional ByVal l As Variant) As Double
-	Dim tmp() As Double
-	Dim t As Double
-	Dim temp As Variant
-	Dim z As Long
-	temp = Array(a,b,c,d,e,f,g,h,i,j,k,l)
-	tmp = EvalArgs(temp)
-
-	t = tmp(0)
-	For z = 1 To UBound(tmp) Step 1
-		 t = t + tmp(z)
-	Next
-
-	Sum = t
+Public Function Sum(ByVal a As Variant, Optional ByVal b As Variant, Optional ByVal c As Variant, Optional ByVal d As Variant, Optional ByVal e As Variant, Optional ByVal f As Variant, Optional ByVal g As Variant, Optional ByVal h As Variant, Optional ByVal i As Variant, Optional ByVal j As Variant, Optional ByVal k As Variant, Optional ByVal l As Variant) As Double
+    Dim tmp() As Double
+    Dim n As Long
+    Dim z As Long
+    n = 0
+    Call AppendEvalArg(a, tmp, n)
+    If Not IsMissing(b) Then Call AppendEvalArg(b, tmp, n)
+    If Not IsMissing(c) Then Call AppendEvalArg(c, tmp, n)
+    If Not IsMissing(d) Then Call AppendEvalArg(d, tmp, n)
+    If Not IsMissing(e) Then Call AppendEvalArg(e, tmp, n)
+    If Not IsMissing(f) Then Call AppendEvalArg(f, tmp, n)
+    If Not IsMissing(g) Then Call AppendEvalArg(g, tmp, n)
+    If Not IsMissing(h) Then Call AppendEvalArg(h, tmp, n)
+    If Not IsMissing(i) Then Call AppendEvalArg(i, tmp, n)
+    If Not IsMissing(j) Then Call AppendEvalArg(j, tmp, n)
+    If Not IsMissing(k) Then Call AppendEvalArg(k, tmp, n)
+    If Not IsMissing(l) Then Call AppendEvalArg(l, tmp, n)
+    Sum = 0#
+    For z = 0 To n - 1
+        Sum = Sum + tmp(z)
+    Next
 End Function
 
-'Geometric average of values
-Private Function Avg(ByVal a As Variant, Optional ByVal b As Variant, Optional ByVal c As Variant, Optional ByVal d As Variant, Optional ByVal e As Variant, Optional ByVal f As Variant, Optional ByVal g As Variant, Optional ByVal h As Variant, Optional ByVal i As Variant, Optional ByVal j As Variant, Optional ByVal k As Variant, Optional ByVal l As Variant) As Double
-	Dim tmp() As Double
-	Dim t As Double
-	Dim temp As Variant
-	Dim z As Long
-	temp = Array(a,b,c,d,e,f,g,h,i,j,k,l)
-	tmp = EvalArgs(temp)
-
-	t = tmp(0)
-	For z = 1 To UBound(tmp) Step 1
-		 t = t + tmp(z)
-	Next
-
-	Avg = t / (UBound(tmp) + 1)
+Public Function Avg(ByVal a As Variant, Optional ByVal b As Variant, Optional ByVal c As Variant, Optional ByVal d As Variant, Optional ByVal e As Variant, Optional ByVal f As Variant, Optional ByVal g As Variant, Optional ByVal h As Variant, Optional ByVal i As Variant, Optional ByVal j As Variant, Optional ByVal k As Variant, Optional ByVal l As Variant) As Double
+    Dim tmp() As Double
+    Dim n As Long
+    Dim z As Long
+    n = 0
+    Call AppendEvalArg(a, tmp, n)
+    If Not IsMissing(b) Then Call AppendEvalArg(b, tmp, n)
+    If Not IsMissing(c) Then Call AppendEvalArg(c, tmp, n)
+    If Not IsMissing(d) Then Call AppendEvalArg(d, tmp, n)
+    If Not IsMissing(e) Then Call AppendEvalArg(e, tmp, n)
+    If Not IsMissing(f) Then Call AppendEvalArg(f, tmp, n)
+    If Not IsMissing(g) Then Call AppendEvalArg(g, tmp, n)
+    If Not IsMissing(h) Then Call AppendEvalArg(h, tmp, n)
+    If Not IsMissing(i) Then Call AppendEvalArg(i, tmp, n)
+    If Not IsMissing(j) Then Call AppendEvalArg(j, tmp, n)
+    If Not IsMissing(k) Then Call AppendEvalArg(k, tmp, n)
+    If Not IsMissing(l) Then Call AppendEvalArg(l, tmp, n)
+    Avg = 0#
+    For z = 0 To n - 1
+        Avg = Avg + tmp(z)
+    Next
+    Avg = Avg / n
 End Function
 
-'Evaluation function for arguments - if they were passed or not
-Private Function EvalArgs(ByRef x() As Variant) As Variant
-	Dim tmp() As Double
-	Dim i As Long, j As Long, k As Long
-	k = -1
-	For i = 0 To UBound(x) Step 1
-		If Not IsMissing(x(i)) Then
-			If IsArray(x(i)) Then
-				For j = 0 To UBound(x(i)) Step 1
-					k = k + 1
-					ReDim Preserve tmp(k)
-					tmp(k) = CDbl(x(i)(j))
-				Next
-			Else
-				k = k + 1
-				ReDim Preserve tmp(k)
-				tmp(k) = CDbl(x(i))
-			End If
-		End If
-	Next
-	EvalArgs = tmp
-End Function
+Private Sub AppendEvalArg(ByVal value As Variant, ByRef values() As Double, ByRef count As Long)
+    Dim j As Long
+    If IsArray(value) Then
+        For j = 0 To UBound(value)
+            Call AppendEvalScalar(CDbl(value(j)), values, count)
+        Next
+    Else
+        Call AppendEvalScalar(CDbl(value), values, count)
+    End If
+End Sub
+
+Private Sub AppendEvalScalar(ByVal value As Double, ByRef values() As Double, ByRef count As Long)
+    If count = 0 Then
+        ReDim values(0)
+    Else
+        ReDim Preserve values(count)
+    End If
+    values(count) = value
+    count = count + 1
+End Sub

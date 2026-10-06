@@ -1,0 +1,123 @@
+POPUP "VBA"
+BEGIN
+      POPUP "PARS"
+      BEGIN
+            POPUP "Color"
+            BEGIN
+                 MENUITEM "Choose Separate Colors for RBE2s and RBE3s", "C:\HONZA\programming\femap\PARS\Color\Choose_Separate_Colors_for_RBE2s_and_RBE3s.BAS"
+                 MENUITEM "Color Elements To Match Property", "C:\HONZA\programming\femap\PARS\Color\Color_Elements_To_Match_Property.BAS"
+                 MENUITEM "Color Elements To Match Solids", "C:\HONZA\programming\femap\PARS\Color\Color_Elements_To_Match_Solids.BAS"
+                 MENUITEM "Color Elements To Match Surfaces", "C:\HONZA\programming\femap\PARS\Color\Color_Elements_To_Match_Surfaces.BAS"
+                 MENUITEM "Set Default RBE2/RBE3 Colors", "C:\HONZA\programming\femap\PARS\Color\Set_Separate_Colors_for_RBE2s_and_RBE3s.BAS"
+            END
+            POPUP "Combinations"
+            BEGIN
+                 MENUITEM "Comb LC1", "C:\HONZA\programming\femap\PARS\Combinations\Comb_LC1.BAS"
+                 MENUITEM "Comb LC2", "C:\HONZA\programming\femap\PARS\Combinations\Comb_LC2.bas"
+                 MENUITEM "Load combine1", "C:\HONZA\programming\femap\PARS\Combinations\Load_combine1.bas"
+                 MENUITEM "Load combine2", "C:\HONZA\programming\femap\PARS\Combinations\Load_combine2.bas"
+            END
+            POPUP "Constraints"
+            BEGIN
+                  POPUP "Spring To Ground"
+                  BEGIN
+                        MENUITEM "Create from Beams Bars Rods", "C:\HONZA\programming\femap\PARS\Constraints\Node2Ground_Spring\Spring2Ground_Create_from_BeamsBarsRods.BAS"
+                        MENUITEM "Scale all Directions", "C:\HONZA\programming\femap\PARS\Constraints\Node2Ground_Spring\Spring2Ground_Scale_All_Directions.BAS"
+                        MENUITEM "Scale Individual Directions", "C:\HONZA\programming\femap\PARS\Constraints\Node2Ground_Spring\Spring2Ground_Scale_Individual_Directions.BAS"
+                        MENUITEM "Set Translational Stiffness 0.38/0.62/1.00", "C:\HONZA\programming\femap\PARS\Constraints\Node2Ground_Spring\Spring2Ground_Set_Translational_Stiffness_038_062_100.BAS"
+                        MENUITEM "Update Legacy Translational Stiffness", "C:\HONZA\programming\femap\PARS\Constraints\Node2Ground_Spring\Spring2Ground_Update_Legacy_Translational_Stiffness.BAS"
+                  END
+            END
+            POPUP "Elements"
+            BEGIN
+                 MENUITEM "Add Mass Elements to Selected Nodes", "C:\HONZA\programming\femap\PARS\Elements\Add_Mass_Elements_to_Selected_Nodes.BAS"
+                 MENUITEM "Random Color by Property", "C:\HONZA\programming\femap\PARS\Elements\Element_Random_Color_by_Property.BAS"
+                 MENUITEM "Measure Planar Elements Area", "C:\HONZA\programming\femap\PARS\Elements\Measure_Planar_Elements_Area.BAS"
+                 MENUITEM "Reflect Using Line", "C:\HONZA\programming\femap\PARS\Elements\Reflect_Element_Using_Line.BAS"
+                 MENUITEM "Renumber Element as Lower Node ID", "C:\HONZA\programming\femap\PARS\Elements\Renumber_Element_As_Lower_Node_ID.BAS"
+                 MENUITEM "Renumber Element as Higher Node ID", "C:\HONZA\programming\femap\PARS\Elements\Renumber_Element_As_Higher_Node_ID.BAS"
+            END
+            POPUP "Groups"
+            BEGIN
+                 MENUITEM "Generate Group from Output", "C:\HONZA\programming\femap\PARS\Groups\Generate_Group_from_Output.BAS"
+                 MENUITEM "Group from Output", "C:\HONZA\programming\femap\PARS\Groups\Groups_from_Output.BAS"
+                 MENUITEM "Groups Select Mesh", "C:\HONZA\programming\femap\PARS\Groups\Groups_Select_Mesh.BAS"
+                 MENUITEM "Group Elements in Compression across OSets", "C:\HONZA\programming\femap\PARS\Groups\Group_Elements_in_Compression_across_OSets.BAS"
+            END
+            POPUP "Input"
+            BEGIN
+                 MENUITEM "Import Model from DAT", "C:\HONZA\programming\femap\PARS\Input\Import_Model_from_DAT.BAS"
+                 MENUITEM "Dress Model from DAT", "C:\HONZA\programming\femap\PARS\Input\Dress_Model_from_DAT.BAS"
+            END
+            POPUP "Loading"
+            BEGIN
+                 MENUITEM "Element Load by Force", "C:\HONZA\programming\femap\PARS\Loading\Element_Load_by_Force.BAS"
+                 MENUITEM "Element Load Linear Distributed Start End in X", "C:\HONZA\programming\femap\PARS\Loading\Element_Load_Linear_Distributed_Start_End_in_X.BAS"
+                 MENUITEM "Load Plate Element by Projected Area", "C:\HONZA\programming\femap\PARS\Loading\Load_Plate_Element_by_Projected_Area.BAS"
+                 MENUITEM "SEI LSet from T3 Applied GPForce", "C:\HONZA\programming\femap\PARS\Loading\SEI_LSet_from_T3_Applied_GPForce.BAS"
+            END
+            POPUP "Output"
+            BEGIN
+                 MENUITEM "Pars out Bars", "C:\HONZA\programming\femap\PARS\Output\Pars_out_Bars.BAS"
+                 MENUITEM "Pars out Bars HONZA", "C:\HONZA\programming\femap\PARS\Output\Pars_out_Bars_HONZA.BAS"
+                 MENUITEM "Pars out Beams1", "C:\HONZA\programming\femap\PARS\Output\Pars_out_Beams1.BAS"
+                 MENUITEM "Pars out Beams2", "C:\HONZA\programming\femap\PARS\Output\Pars_out_Beams2.BAS"
+                 MENUITEM "Pars out constr", "C:\HONZA\programming\femap\PARS\Output\Pars_out_constr.BAS"
+                 MENUITEM "Pars out displ", "C:\HONZA\programming\femap\PARS\Output\Pars_out_displ.BAS"
+                 MENUITEM "Pars out Rods", "C:\HONZA\programming\femap\PARS\Output\Pars_out_Rods.BAS"
+                 MENUITEM "VonMises Contour Cleanup", "C:\HONZA\programming\femap\PARS\Output\Process_Forces_To_VonMises_Contour_Cleanup.BAS"
+            END
+            POPUP "RBE"
+            BEGIN
+                 MENUITEM "RBE2 Nodes Switch Master Slave", "C:\HONZA\programming\femap\PARS\RBE\RBE2_Nodes_Switch_Master_Slave.BAS"
+                 MENUITEM "RBE2 Nodes Update Releases", "C:\HONZA\programming\femap\PARS\RBE\RBE2_Nodes_Update_Releases.BAS"
+                 MENUITEM "RBE2 RBE3 Sort to Groups", "C:\HONZA\programming\femap\PARS\RBE\RBE2_RBE3_Sort_to_Groups.BAS"
+                 MENUITEM "RBE2 Sum Multipoint GPForces To Excel", "C:\HONZA\programming\femap\PARS\RBE\Excel\RBE2_Sum_Multipoint_GPForces_To_Excel.BAS"
+                 MENUITEM "RBE2 Update Thermal Coefficient", "C:\HONZA\programming\femap\PARS\RBE\RBE2_Update_Thermal_Coefficient.BAS"
+                 MENUITEM "RBE3 from Beam End Nodes", "C:\HONZA\programming\femap\PARS\RBE\RBE3_from_Beam_End_Nodes.BAS"
+                 MENUITEM "RBE3 from Nodes With Nodal Loads Area", "C:\HONZA\programming\femap\PARS\RBE\RBE3_from_Nodes_With_Nodal_Loads_Area.BAS"
+                 MENUITEM "RBE3 from Srfs With Nodal Loads Area Normal", "C:\HONZA\programming\femap\PARS\RBE\RBE3_from_Srfs_With_Nodal_Loads_Area_Normal.BAS"
+                 MENUITEM "RBE3 from Srfs With Nodal Loads Area Z", "C:\HONZA\programming\femap\PARS\RBE\RBE3_from_Srfs_With_Nodal_Loads_Area_Z.BAS"
+                 MENUITEM "RBE3 from Srfs With Nodal Loads Area Z project", "C:\HONZA\programming\femap\PARS\RBE\RBE3_from_Srfs_With_Nodal_Loads_Area_Z_project.BAS"
+                 MENUITEM "RBE3 Master Node Update Releases", "C:\HONZA\programming\femap\PARS\RBE\RBE3_Master_Node_Update_Releases.BAS"
+                 MENUITEM "RBE3 Nodal Loads From Area by Vertices", "C:\HONZA\programming\femap\PARS\RBE\RBE3_Nodal_Loads_From_Area_by_Vertices.BAS"
+                 MENUITEM "RBE Delete Unreferenced Nodes", "C:\HONZA\programming\femap\PARS\RBE\RBE_Delete_Unreferenced_Nodes.BAS"
+                 MENUITEM "RBE Nodes Replace", "C:\HONZA\programming\femap\PARS\RBE\RBE_Nodes_Replace.BAS"
+                 MENUITEM "RBE Nodes Replace Master", "C:\HONZA\programming\femap\PARS\RBE\RBE_Nodes_Replace_Master.BAS"
+                 MENUITEM "RBE Renumber As Master Node ID", "C:\HONZA\programming\femap\PARS\RBE\RBE_Renumber_As_Master_Node_ID.BAS"
+            END
+            POPUP "Results"
+            BEGIN
+                 MENUITEM "Move Nodes by Deformation", "C:\HONZA\programming\femap\PARS\Results\Nodes_Move_By_Deform.BAS"
+                 MENUITEM "Move Nodes by Deformation with Options", "C:\HONZA\programming\femap\PARS\Results\Nodes_Move_By_Deform_with_Options.BAS"
+                 MENUITEM "Show Error Nodes", "C:\HONZA\programming\femap\PARS\Results\Show_Error_Nodes.BAS"
+            END
+            POPUP "Sort Elements"
+            BEGIN
+                 MENUITEM "Export Selected Sorted Groups To Excel", "C:\HONZA\programming\femap\PARS\Sort Elements\Excel\Sort_Elements_to_Groups-Export_Selected_To_Excel.BAS"
+                 MENUITEM "Export All Sorted Groups To Excel", "C:\HONZA\programming\femap\PARS\Sort Elements\Excel\Sort_Elements_to_Groups-Export_To_Excel.BAS"
+                 MENUITEM "Sorted Groups - Group removal", "C:\HONZA\programming\femap\PARS\Sort Elements\Sort_Elements_to_Groups-Group_removal.BAS"
+            END
+            POPUP "Sum Forces"
+            BEGIN
+                 MENUITEM "Sum Forces 1e with body All LCs", "C:\HONZA\programming\femap\PARS\Sum Forces\Sum_Forces_1e_with_body_All_LCs.BAS"
+                 MENUITEM "Sum Forces 1e with body One LC", "C:\HONZA\programming\femap\PARS\Sum Forces\Sum_Forces_1e_with_body_One_LC.BAS"
+                 MENUITEM "Sum Forces 1n with body All LCs", "C:\HONZA\programming\femap\PARS\Sum Forces\Sum_Forces_1n_with_body_All_LCs.BAS"
+                 MENUITEM "Sum Forces 1n with body One LC", "C:\HONZA\programming\femap\PARS\Sum Forces\Sum_Forces_1n_with_body_One_LC.BAS"
+                 MENUITEM "Sum Forces All with body All LCs", "C:\HONZA\programming\femap\PARS\Sum Forces\Sum_Forces_All_with_body_All_LCs.BAS"
+                 MENUITEM "Sum Forces All with body One LC", "C:\HONZA\programming\femap\PARS\Sum Forces\Sum_Forces_All_with_body_One_LC.bas"
+            END
+            POPUP "View"
+            BEGIN
+                 MENUITEM "Active Constraint Set Down", "C:\HONZA\programming\femap\PARS\View\Active_Constraint_Set_Down.BAS"
+                 MENUITEM "Active Constraint Set Up", "C:\HONZA\programming\femap\PARS\View\Active_Constraint_Set_Up.BAS"
+                 MENUITEM "Active Group Down", "C:\HONZA\programming\femap\PARS\View\Active_Group_Down.BAS"
+                 MENUITEM "Active Group Up", "C:\HONZA\programming\femap\PARS\View\Active_Group_Up.BAS"
+                 MENUITEM "Active Load Set Down", "C:\HONZA\programming\femap\PARS\View\Active_Load_Set_Down.BAS"
+                 MENUITEM "Active Load Set Up", "C:\HONZA\programming\femap\PARS\View\Active_Load_Set_Up.BAS"
+                 MENUITEM "ManageViews", "C:\HONZA\programming\femap\PARS\View\ManageViews.BAS"
+                 MENUITEM "Show Active Material", "C:\HONZA\programming\femap\PARS\View\Show_Active_Material.BAS"
+                 MENUITEM "Show Active Property", "C:\HONZA\programming\femap\PARS\View\Show_Active_Property.BAS"
+            END
+      END
+END

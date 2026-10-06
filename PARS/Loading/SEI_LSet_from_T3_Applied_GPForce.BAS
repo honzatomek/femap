@@ -1,9 +1,13 @@
-Attribute VB_Name = "Module3"
+' =============================================================================
+' Description: Creates a load set from selected applied grid-point-force output results.
+' Compatibility: Nastran for Windows 2004 and modern FEMAP.
+' =============================================================================
+
 Option Explicit
 
 Sub Main
-	Dim App As femap.model
-    Set App = feFemap()
+	Dim App As Object
+    Set App = feGetObject()
     Dim rc As Long
     Dim i As Long
 
@@ -38,7 +42,10 @@ Sub Main
 	If InStr(1, tmp, ".") <> 0 Then tmp = Replace(tmp, ".", ",")
 	scof = CDbl(tmp)
 
-	rc = o.GetFromSet(oset.Next(), 174)
+	Dim selectedOutputSetID As Long
+	selectedOutputSetID = oset.Next()
+	o.setID = selectedOutputSetID
+	rc = o.Get(174)
 	rc = ndset.Reset()
 	ndID = ndset.Next()
 

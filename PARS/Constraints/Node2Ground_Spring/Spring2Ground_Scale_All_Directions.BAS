@@ -1,55 +1,65 @@
-Option Explicit On
+' =============================================================================
+' Description: Scales all six stiffness components of selected spring-to-ground properties by one factor.
+' Compatibility: Nastran for Windows 2004 and modern FEMAP.
+' =============================================================================
+
+Option Explicit
+
+' N4W/FEMAP portable constants (do not rely on type-library enum names)
+Const C_FE_FAIL As Long = 0
+Const C_FE_CANCEL As Long = 2
+Const C_FT_PROP As Long = 11
+Const C_MSG_NORMAL As Long = 0
 
 Const DBUG As Boolean = False
 Private er As Long
 
 Sub Main
-    Dim App As femap.model
-    Set App = feFemap()
+    Dim App As Object
+    Set App = feGetObject()
+
     Dim rc As Long, i As Long
-
-    er = 0
-
-    If Not DBUG Then On Error GoTo Cleanup
-
     Dim pset As Object
-    Set pset = App.feSet()
-    Dim pID As Long
     Dim p As Object
-    Set p = App.feProp()
-    Dim tmp As Double
+    Dim pID As Long
     Dim scale As Double
 
-    scale = 1.0
+    er = 0
+    scale = 1#
+    If Not DBUG Then On Error GoTo Cleanup
 
-    rc = pset.Select(FT_PROP, True, "Select Spring propeties to scale:")
+    Set pset = App.feSet()
+    Set p = App.feProp()
+
+    rc = pset.Select(C_FT_PROP, True, "Select Spring properties to scale:")
     Do While rc = -1
-		If (rc <> -1) Or (pset.Count() < 1) Then
-			GoTo Cleanup
-		End If
+        If pset.Count() < 1 Then GoTo Cleanup
 
-		rc = App.feGetReal("Input Stiffness Scale Value", -1.0e-16, 1.0e16, scale)
-		If rc = FE_CANCEL Then GoTo Cleanup
+        rc = App.feGetReal("Input Stiffness Scale Value", -1.0E-16, 1.0E+16, scale)
+        If rc = C_FE_CANCEL Then GoTo Cleanup
 
-		rc = pset.Reset()
-		pID = pset.Next()
-		Do While pID <> FE_FAIL
-			rc = p.Get(pID)
-			If (p.type = 41) And (p.cbush = 1) Then
-				For i = 36 To 41 Step 1
-					p.pval(i) = p.pval(i) * scale
-				Next
-				p.Put(pID)
-			End If
-			pID = pset.Next()
-		Loop
-		rc = pset.Select(FT_PROP, True, "Select Spring propeties to scale:")
-	Loop
+        rc = pset.Reset()
+        pID = pset.Next()
+        Do While pID > 0
+            rc = p.Get(pID)
+            If rc <> C_FE_FAIL Then
+                If (p.type = 41) And (p.cbush = 1) Then
+                    For i = 36 To 41 Step 1
+                        p.pval(i) = p.pval(i) * scale
+                    Next
+                    rc = p.Put(pID)
+                End If
+            End If
+            pID = pset.Next()
+        Loop
+
+        rc = pset.Select(C_FT_PROP, True, "Select Spring properties to scale:")
+    Loop
 
 Cleanup:
-	Call App.feAppMessage(FCM_NORMAL, "The script exited with code: " & er)
-	On Error Resume Next
-	Set p = Nothing
-	Set pset = Nothing
-	Set App = Nothing
+    On Error Resume Next
+    Call App.feAppMessage(C_MSG_NORMAL, "The script exited with code: " & er)
+    Set p = Nothing
+    Set pset = Nothing
+    Set App = Nothing
 End Sub

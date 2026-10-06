@@ -1,68 +1,79 @@
+' =============================================================================
+' Description: Sorts all rigid elements into separate RBE2 and RBE3 FEMAP groups.
+' Compatibility: Nastran for Windows 2004 and modern FEMAP.
+' =============================================================================
+
 Option Explicit
 
-Const DBUG As Boolean = True
+' Sort all rigid elements into RBE2 and RBE3 groups.
+
+Const C_FE_OK As Long = -1
+Const C_FT_ELEM As Long = 8
+Const C_FET_RIGID As Long = 29
+Const C_FGD_ELEM_BYTYPE As Long = 24
 
 Sub Main
-	Dim App As femap.model
-	Set App = feFemap
-	Dim rc As Long, i As Long
+    Dim App As Object
+    Set App = feGetObject()
 
-	On Error GoTo ExitHere
+    Dim elset As Object
+    Dim rbe2set As Object
+    Dim rbe3set As Object
+    Dim el As Object
+    Dim g2 As Object
+    Dim g3 As Object
+    Dim rc As Long
+    Dim elID As Long
+    Dim gid As Long
 
-	Dim elset As Object
-	Set elset = App.feSet()
+    Set elset = App.feSet()
+    Set rbe2set = App.feSet()
+    Set rbe3set = App.feSet()
+    Set el = App.feElem()
+    Set g2 = App.feGroup()
+    Set g3 = App.feGroup()
 
-	Dim g2 As Object
-	Set g2 = App.feGroup()
+    On Error GoTo ErrorHandler
 
-	Dim g3 As Object
-	Set g3 = App.feGroup()
+    rc = elset.AddRule(C_FET_RIGID, C_FGD_ELEM_BYTYPE)
+    If (rc <> C_FE_OK) Or (elset.Count() = 0) Then GoTo ExitHere
 
-	Dim gset2 As Object
-	Set gset2 = App.feSet()
+    rc = elset.Reset()
+    elID = elset.Next()
+    Do While elID <> 0
+        rc = el.Get(elID)
+        If rc = C_FE_OK Then
+            If el.RigidInterpolate Then
+                rc = rbe3set.Add(elID)
+            Else
+                rc = rbe2set.Add(elID)
+            End If
+        End If
+        elID = elset.Next()
+    Loop
 
-	Dim gset3 As Object
-	Set gset3 = App.feSet()
+    gid = g2.NextEmptyID()
+    g2.title = "RBE2"
+    rc = g2.Put(gid)
+    If rbe2set.Count() > 0 Then rc = g2.SetAdd(C_FT_ELEM, rbe2set.ID)
+    rc = g2.Put(g2.ID)
 
-	Dim el As Object
-	Set el = App.feElem()
+    gid = g3.NextEmptyID()
+    g3.title = "RBE3"
+    rc = g3.Put(gid)
+    If rbe3set.Count() > 0 Then rc = g3.SetAdd(C_FT_ELEM, rbe3set.ID)
+    rc = g3.Put(g3.ID)
+    GoTo ExitHere
 
-	Dim gID As Long
-
-	rc = elset.AddRule(29, FGD_ELEM_BYTYPE)
-	If (rc <> -1) Or (elset.Count() = 0) Then GoTo ExitHere
-
-	rc = elset.Reset()
-	For i = 0 To elset.Count() - 1 Step 1
-	 	rc = el.Get(elset.Next())
-		If el.RigidInterpolate Then
-			rc = gset3.Add(el.ID)
-		Else
-			rc = gset2.Add(el.ID)
-		End If
-	Next
-
-	gID = g2.NextEmptyID()
-	g2.title = "RBE2"
-	rc = g2.Put(gID)
-
-	gID = g3.NextEmptyID()
-	g3.title = "RBE3"
-	rc = g3.Put(gID)
-
-	rc = g2.SetAdd(FT_ELEM, gset2.ID)
-	rc = g3.SetAdd(FT_ELEM, gset3.ID)
-
-	rc = g2.Put(g2.ID)
-	rc = g3.Put(g3.ID)
+ErrorHandler:
+    MsgBox "Error " & CStr(Err.Number) & ": " & Err.Description
 
 ExitHere:
-	On Error Resume Next
-	Set gset2 = Nothing
-	Set gset3 = Nothing
-	Set el = Nothing
-	Set g3 = Nothing
-	Set g2 = Nothing
-	Set elset = Nothing
-	Set App = Nothing
+    Set g3 = Nothing
+    Set g2 = Nothing
+    Set el = Nothing
+    Set rbe3set = Nothing
+    Set rbe2set = Nothing
+    Set elset = Nothing
+    Set App = Nothing
 End Sub
