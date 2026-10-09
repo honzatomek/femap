@@ -22,6 +22,8 @@ Const C_FT_GROUP As Long = 24
 Const C_FT_ELEM As Long = 8
 Const C_FT_PROP As Long = 11
 Const C_FT_TEXT As Long = 21
+Const C_FGR_TEXT_ID As Long = 14
+Const C_FGR_PROP_ID As Long = 30
 Const C_FCM_NORMAL As Long = 0
 
 Sub Main
@@ -492,9 +494,9 @@ Private Sub CreateGroup()
 	rc = txt.Put(grpID)
 
 	grp.title= "BEAM" & grpID & "[" & prp.ID & "] - " & prp.title
-	rc = grp.SetAdd(8, elset.ID)
-	rc = grp.Add(C_FT_PROP, prp.ID)
-	rc = grp.Add(C_FT_TEXT, grpID)
+	rc = grp.SetAdd(C_FT_ELEM, elset.ID)
+	rc = grp.RangeAdd(C_FGR_PROP_ID, prp.ID, 0, 1, 1)
+	rc = grp.RangeAdd(C_FGR_TEXT_ID, grpID, 0, 1, 1)
 	rc = grp.Put(grpID)
 
 	rc = elset.Clear()

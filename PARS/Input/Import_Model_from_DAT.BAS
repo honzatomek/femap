@@ -16,6 +16,13 @@ Const C_FT_CSYS As Long = 9
 Const C_FT_MATL As Long = 10
 Const C_FT_PROP As Long = 11
 
+' Group Range Types used by feGroup.RangeAdd.
+Const C_FGR_CSYS_ID As Long = 0
+Const C_FGR_NODE_ID As Long = 17
+Const C_FGR_ELEM_ID As Long = 21
+Const C_FGR_MATL_ID As Long = 26
+Const C_FGR_PROP_ID As Long = 30
+
 Sub Main()
     Dim App As Object
     Dim fileName As String
@@ -858,12 +865,35 @@ Private Sub ExpandSetRange(ByRef groupObj As Object, ByVal entityType As Long, _
     Loop
 End Sub
 
+Private Function GroupRangeTypeForEntity(ByVal entityType As Long) As Long
+    GroupRangeTypeForEntity = -1
+
+    If entityType = C_FT_CSYS Then
+        GroupRangeTypeForEntity = C_FGR_CSYS_ID
+    ElseIf entityType = C_FT_NODE Then
+        GroupRangeTypeForEntity = C_FGR_NODE_ID
+    ElseIf entityType = C_FT_ELEM Then
+        GroupRangeTypeForEntity = C_FGR_ELEM_ID
+    ElseIf entityType = C_FT_MATL Then
+        GroupRangeTypeForEntity = C_FGR_MATL_ID
+    ElseIf entityType = C_FT_PROP Then
+        GroupRangeTypeForEntity = C_FGR_PROP_ID
+    End If
+End Function
+
 Private Sub AddGroupMember(ByRef groupObj As Object, ByVal entityType As Long, _
                            ByVal entityID As Long, ByRef membersAdded As Long, _
                            ByRef missing As Long)
     Dim rc As Long
+    Dim rangeType As Long
 
-    rc = groupObj.Add(entityType, entityID)
+    rangeType = GroupRangeTypeForEntity(entityType)
+    If rangeType < 0 Then
+        missing = missing + 1
+        Exit Sub
+    End If
+
+    rc = groupObj.RangeAdd(rangeType, entityID, 0, 1, 1)
     If rc = C_FE_OK Then
         membersAdded = membersAdded + 1
     Else
