@@ -141,7 +141,10 @@ Sub Main()
     Set f = Nothing
 
     rc = CreateGroupsFromSetComments(App, fileName, groupsCreated, groupMembers, missing, malformed)
-    If rc <> C_FE_OK Then malformed = malformed + 1
+    If rc <> C_FE_OK Then
+        MsgBox "Model imported, but group dressing was not completed.", 48, "Import Model from DAT"
+        GoTo ExitHere
+    End If
 
     App.feViewRegenerate(0)
 
@@ -452,20 +455,32 @@ Private Function CreateGroupsFromSetComments(ByRef App As Object, ByVal fileName
     Dim pendingType As Long
     Dim pendingGroupID As Long
     Dim pendingName As String
-
-    Dim groupActive As Boolean
+    Dim blockActive As Boolean
     Dim groupObj As Object
     Dim activeType As Long
     Dim activeGroupID As Long
     Dim activeName As String
-
     Dim rangeState As Long
     Dim rangeStart As Long
     Dim rangeEnd As Long
     Dim lastID As Long
+    Dim beforeMembers As Long
+    Dim currentIndex As Long
+    Dim countGroups As Long
+    Dim groupIDs(255) As Long
+    Dim expectedNodes(255) As Long
+    Dim expectedElements(255) As Long
+    Dim verifyIndex As Long
+    Dim checkGroup As Object
+    Dim checkMembers As Object
+    Dim observedNodes As Long
+    Dim observedElements As Long
 
+    ' One fresh FEMAP Group object and one Put per engineering group ID.
+    ' NODE and ELEMENT SET1 blocks are accumulated on the SAME unsaved object.
+    ' Loading/saving an incomplete Group between those blocks can entangle
+    ' memberships in older FEMAP/Nastran4Win releases.
     CreateGroupsFromSetComments = 0
-
     Set f = App.feRead
     rc = f.Open(fileName, 100)
     If rc <> C_FE_OK Then
@@ -479,67 +494,93 @@ Private Function CreateGroupsFromSetComments(ByRef App As Object, ByVal fileName
         lineText = f.Line
         handled = False
 
-        ' SET1 continuation lines belong to the current GROUP block.
-        If groupActive Then
+        If blockActive Then
             If IsSetContinuationLine(lineText) Then
+                beforeMembers = membersAdded
                 AddSet1Members groupObj, activeType, lineText, False, _
                                rangeState, rangeStart, rangeEnd, lastID, _
                                membersAdded, missing, malformed
+                If activeType = C_FT_NODE Then
+                    expectedNodes(currentIndex) = expectedNodes(currentIndex) + membersAdded - beforeMembers
+                ElseIf activeType = C_FT_ELEM Then
+                    expectedElements(currentIndex) = expectedElements(currentIndex) + membersAdded - beforeMembers
+                End If
                 handled = True
             Else
-                FinalizeGroupBlock groupObj, activeType, activeGroupID, activeName, _
-                                   rangeState, rangeStart, rangeEnd, lastID, _
-                                   groupsCreated, membersAdded, missing, malformed
-                groupActive = False
-                Set groupObj = Nothing
+                beforeMembers = membersAdded
+                FlushSetRange groupObj, activeType, rangeState, rangeStart, _
+                              rangeEnd, lastID, membersAdded, missing, malformed
+                If activeType = C_FT_NODE Then
+                    expectedNodes(currentIndex) = expectedNodes(currentIndex) + membersAdded - beforeMembers
+                ElseIf activeType = C_FT_ELEM Then
+                    expectedElements(currentIndex) = expectedElements(currentIndex) + membersAdded - beforeMembers
+                End If
+                blockActive = False
             End If
         End If
 
         If Not handled Then
             If IsCommentLine(lineText) Then
-                ' Only GROUP metadata comments affect pending SET1 interpretation.
                 If Left$(UCase$(Trim$(lineText)), 7) = "$ GROUP" Then
                     If pendingType <> 0 Then malformed = malformed + 1
                     pendingType = 0
                     pendingGroupID = 0
                     pendingName = ""
-
                     If Not ParseGroupComment(lineText, pendingGroupID, pendingName, pendingType) Then
                         malformed = malformed + 1
                     End If
                 End If
-
             ElseIf Trim$(lineText) <> "" Then
                 If pendingType <> 0 Then
                     If BulkCardName(lineText) = "SET1" And Set1ID(lineText) > 0 Then
-                        Set groupObj = App.feGroup()
-                        activeType = pendingType
-                        activeGroupID = pendingGroupID
-                        activeName = pendingName
-
-                        rc = groupObj.Get(activeGroupID)
-                        If rc = C_FE_OK Then
-                            If groupObj.title <> "" And groupObj.title <> activeName Then
-                                ' The metadata comment is authoritative, but a
-                                ' name mismatch is still worth reporting.
-                                malformed = malformed + 1
+                        If groupObj Is Nothing Then
+                            If Not OpenFreshEngineeringGroup(App, pendingGroupID, pendingName, groupObj) Then
+                                GoTo ImportFailed
                             End If
+                            activeGroupID = pendingGroupID
+                            activeName = pendingName
+                            countGroups = countGroups + 1
+                            If countGroups > 255 Then GoTo ImportFailed
+                            currentIndex = countGroups
+                            groupIDs(currentIndex) = activeGroupID
+                        ElseIf pendingGroupID <> activeGroupID Then
+                            If Not CommitEngineeringGroup(groupObj, activeGroupID, activeName, groupsCreated) Then
+                                GoTo ImportFailed
+                            End If
+                            Set groupObj = Nothing
+                            If Not OpenFreshEngineeringGroup(App, pendingGroupID, pendingName, groupObj) Then
+                                GoTo ImportFailed
+                            End If
+                            activeGroupID = pendingGroupID
+                            activeName = pendingName
+                            countGroups = countGroups + 1
+                            If countGroups > 255 Then GoTo ImportFailed
+                            currentIndex = countGroups
+                            groupIDs(currentIndex) = activeGroupID
+                        ElseIf pendingName <> activeName Then
+                            MsgBox "Inconsistent title for Group " & CStr(activeGroupID), _
+                                   48, "Import Model from DAT"
+                            GoTo ImportFailed
                         End If
-                        groupObj.title = activeName
 
+                        activeType = pendingType
                         rangeState = 0
                         rangeStart = 0
                         rangeEnd = 0
                         lastID = 0
-
+                        beforeMembers = membersAdded
                         AddSet1Members groupObj, activeType, lineText, True, _
                                        rangeState, rangeStart, rangeEnd, lastID, _
                                        membersAdded, missing, malformed
-                        groupActive = True
+                        If activeType = C_FT_NODE Then
+                            expectedNodes(currentIndex) = expectedNodes(currentIndex) + membersAdded - beforeMembers
+                        ElseIf activeType = C_FT_ELEM Then
+                            expectedElements(currentIndex) = expectedElements(currentIndex) + membersAdded - beforeMembers
+                        End If
+                        blockActive = True
                     Else
                         malformed = malformed + 1
                     End If
-
                     pendingType = 0
                     pendingGroupID = 0
                     pendingName = ""
@@ -548,39 +589,107 @@ Private Function CreateGroupsFromSetComments(ByRef App As Object, ByVal fileName
         End If
     Loop
 
-    If groupActive Then
-        FinalizeGroupBlock groupObj, activeType, activeGroupID, activeName, _
-                           rangeState, rangeStart, rangeEnd, lastID, _
-                           groupsCreated, membersAdded, missing, malformed
-        Set groupObj = Nothing
+    If blockActive Then
+        beforeMembers = membersAdded
+        FlushSetRange groupObj, activeType, rangeState, rangeStart, _
+                      rangeEnd, lastID, membersAdded, missing, malformed
+        If activeType = C_FT_NODE Then
+            expectedNodes(currentIndex) = expectedNodes(currentIndex) + membersAdded - beforeMembers
+        ElseIf activeType = C_FT_ELEM Then
+            expectedElements(currentIndex) = expectedElements(currentIndex) + membersAdded - beforeMembers
+        End If
     End If
-
+    If Not groupObj Is Nothing Then
+        If Not CommitEngineeringGroup(groupObj, activeGroupID, activeName, groupsCreated) Then
+            GoTo ImportFailed
+        End If
+    End If
     If pendingType <> 0 Then malformed = malformed + 1
 
     rc = f.Close()
     Set f = Nothing
+    Set groupObj = Nothing
+
+    ' IMPORTANT: verify AFTER writing ALL groups.  This detects corruption in
+    ' earlier groups caused by later Put calls, not just mistakes on each Put.
+    For verifyIndex = 1 To countGroups
+        Set checkGroup = App.feGroup()
+        rc = checkGroup.Get(groupIDs(verifyIndex))
+        If rc <> C_FE_OK Then
+            MsgBox "Group " & CStr(groupIDs(verifyIndex)) & " disappeared after import.", _
+                   48, "Import Model from DAT"
+            Exit Function
+        End If
+        Set checkMembers = checkGroup.List(C_FT_NODE)
+        observedNodes = 0
+        If Not checkMembers Is Nothing Then observedNodes = checkMembers.Count()
+        Set checkMembers = Nothing
+        Set checkMembers = checkGroup.List(C_FT_ELEM)
+        observedElements = 0
+        If Not checkMembers Is Nothing Then observedElements = checkMembers.Count()
+        Set checkMembers = Nothing
+        Set checkGroup = Nothing
+        If observedNodes <> expectedNodes(verifyIndex) Or _
+           observedElements <> expectedElements(verifyIndex) Then
+            MsgBox "Group " & CStr(groupIDs(verifyIndex)) & " membership mismatch." & Chr$(13) & Chr$(10) & _
+                   "Expected nodes/elements: " & CStr(expectedNodes(verifyIndex)) & "/" & _
+                   CStr(expectedElements(verifyIndex)) & Chr$(13) & Chr$(10) & _
+                   "Actual nodes/elements: " & CStr(observedNodes) & "/" & CStr(observedElements), _
+                   48, "Import Model from DAT"
+            Exit Function
+        End If
+    Next verifyIndex
     CreateGroupsFromSetComments = C_FE_OK
+    Exit Function
+
+ImportFailed:
+    rc = f.Close()
+    Set f = Nothing
+    Set groupObj = Nothing
 End Function
 
-Private Sub FinalizeGroupBlock(ByRef groupObj As Object, ByVal entityType As Long, _
-                               ByVal groupID As Long, ByVal groupName As String, _
-                               ByRef rangeState As Long, ByRef rangeStart As Long, _
-                               ByRef rangeEnd As Long, ByRef lastID As Long, _
-                               ByRef groupsCreated As Long, ByRef membersAdded As Long, _
-                               ByRef missing As Long, ByRef malformed As Long)
+Private Function OpenFreshEngineeringGroup(ByRef App As Object, ByVal groupID As Long, _
+                                           ByVal groupName As String, _
+                                           ByRef groupObj As Object) As Boolean
+    Dim existingGroup As Object
     Dim rc As Long
 
-    FlushSetRange groupObj, entityType, rangeState, rangeStart, rangeEnd, lastID, _
-                  membersAdded, missing, malformed
+    OpenFreshEngineeringGroup = False
+    ' Deleting the whole imported Group is different from RangeDeleteAll:
+    ' the latter does not necessarily remove references/rules or SetAdd data.
+    ' Build on a NEW object instead of Get + in-place mutation.
+    Set existingGroup = App.feGroup()
+    rc = existingGroup.Get(groupID)
+    If rc = C_FE_OK Then
+        rc = existingGroup.Delete(groupID)
+        If rc <> C_FE_OK Then
+            MsgBox "Cannot replace Group " & CStr(groupID) & " (" & groupName & ").", _
+                   48, "Import Model from DAT"
+            Set existingGroup = Nothing
+            Exit Function
+        End If
+    End If
+    Set existingGroup = Nothing
+    Set groupObj = App.feGroup()
+    groupObj.title = groupName
+    OpenFreshEngineeringGroup = True
+End Function
 
+Private Function CommitEngineeringGroup(ByRef groupObj As Object, ByVal groupID As Long, _
+                                         ByVal groupName As String, _
+                                         ByRef groupsCreated As Long) As Boolean
+    Dim rc As Long
+    CommitEngineeringGroup = False
     groupObj.title = groupName
     rc = groupObj.Put(groupID)
-    If rc = C_FE_OK Then
-        groupsCreated = groupsCreated + 1
-    Else
-        malformed = malformed + 1
+    If rc <> C_FE_OK Then
+        MsgBox "Cannot save Group " & CStr(groupID) & " (" & groupName & ").", _
+               48, "Import Model from DAT"
+        Exit Function
     End If
-End Sub
+    groupsCreated = groupsCreated + 1
+    CommitEngineeringGroup = True
+End Function
 
 Private Function ParseGroupComment(ByVal lineText As String, ByRef groupID As Long, _
                                    ByRef groupName As String, ByRef entityType As Long) As Boolean
