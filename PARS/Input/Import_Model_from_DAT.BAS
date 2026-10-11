@@ -36,6 +36,7 @@ Sub Main()
     Dim loadNames As Long
     Dim constraintNames As Long
     Dim propNames As Long
+    Dim materialNames As Long
     Dim propShapes As Long
     Dim propOrients As Long
     Dim groupsCreated As Long
@@ -126,6 +127,16 @@ Sub Main()
                     malformed = malformed + 1
                 End If
 
+            ElseIf InStr(1, lineText, "Material ") > 0 Then
+                rc = UpdateMaterialTitle(App, lineText)
+                If rc = 1 Then
+                    materialNames = materialNames + 1
+                ElseIf rc = -1 Then
+                    missing = missing + 1
+                Else
+                    malformed = malformed + 1
+                End If
+
             ElseIf InStr(1, lineText, "Property ") > 0 Then
                 rc = UpdatePropertyTitle(App, lineText)
                 If rc = 1 Then
@@ -155,6 +166,7 @@ Sub Main()
            "Load sets renamed: " & CStr(loadNames) & Chr$(13) & Chr$(10) & _
            "Constraint sets renamed: " & CStr(constraintNames) & Chr$(13) & Chr$(10) & _
            "Properties renamed: " & CStr(propNames) & Chr$(13) & Chr$(10) & _
+           "Materials renamed: " & CStr(materialNames) & Chr$(13) & Chr$(10) & _
            "Property shapes dressed: " & CStr(propShapes) & Chr$(13) & Chr$(10) & _
            "Property orientations dressed: " & CStr(propOrients) & Chr$(13) & Chr$(10) & _
            "Named groups created/updated: " & CStr(groupsCreated) & Chr$(13) & Chr$(10) & _
@@ -237,6 +249,30 @@ Private Function UpdatePropertyTitle(ByRef App As Object, ByVal lineText As Stri
     If rc = C_FE_OK Then UpdatePropertyTitle = 1
 
     Set p = Nothing
+End Function
+
+ ' Returns 1=updated, -1=material does not exist, 0=malformed/failed.
+Private Function UpdateMaterialTitle(ByRef App As Object, ByVal lineText As String) As Long
+    Dim matID As Long
+    Dim matName As String
+    Dim m As Object
+    Dim rc As Long
+
+    UpdateMaterialTitle = 0
+    If Not ParseIDAndText(lineText, "Material ", matID, matName) Then Exit Function
+
+    Set m = App.feMatl()
+    rc = m.Get(matID)
+    If rc <> C_FE_OK Then
+        UpdateMaterialTitle = -1
+        Set m = Nothing
+        Exit Function
+    End If
+
+    m.title = matName
+    rc = m.Put(matID)
+    If rc = C_FE_OK Then UpdateMaterialTitle = 1
+    Set m = Nothing
 End Function
 
 ' PropShape format written by FEMAP:
