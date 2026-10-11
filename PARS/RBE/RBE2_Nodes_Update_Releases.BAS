@@ -29,6 +29,10 @@ Sub Main
     Dim f As Variant
     Dim w As Variant
     Dim dof As Variant
+    Dim nPut() As Long
+    Dim fPut() As Long
+    Dim wPut() As Double
+    Dim dofPut() As Long
 
     Set elset = App.feSet()
     Set el = App.feElem()
@@ -62,19 +66,36 @@ Sub Main
             rc = el.Get(elID)
             If (rc = C_FE_OK) And (el.type = C_FET_RIGID) And (el.topology = C_FTO_RIGID) And (Not el.RigidInterpolate) Then
                 rc = el.GetNodeList(0, nodecount, n, f, w, dof)
-                If rc = C_FE_OK Then
+                If (rc = C_FE_OK) And (nodecount > 0) Then
+                    ' N4W 2004 cannot safely pass the Variant arrays returned by
+                    ' GetNodeList straight back into PutNodeList. Preserve the
+                    ' existing values in typed one-dimensional arrays.
+                    ReDim nPut(nodecount - 1)
+                    ReDim fPut(nodecount - 1)
+                    ReDim wPut(nodecount - 1)
+                    ReDim dofPut(nodecount * 6 - 1)
+
+                    For i = 0 To nodecount - 1
+                        nPut(i) = CLng(n(i))
+                        fPut(i) = CLng(f(i))
+                        wPut(i) = CDbl(w(i))
+                    Next
+                    For i = 0 To nodecount * 6 - 1
+                        dofPut(i) = CLng(dof(i))
+                    Next
+
                     For i = 0 To 5
                         el.release(0, i) = (gDof(i) <> 0)
                     Next
                     For i = 0 To nodecount - 1
-                        dof(6 * i) = gDof(0)
-                        dof(6 * i + 1) = gDof(1)
-                        dof(6 * i + 2) = gDof(2)
-                        dof(6 * i + 3) = gDof(3)
-                        dof(6 * i + 4) = gDof(4)
-                        dof(6 * i + 5) = gDof(5)
+                        dofPut(6 * i) = gDof(0)
+                        dofPut(6 * i + 1) = gDof(1)
+                        dofPut(6 * i + 2) = gDof(2)
+                        dofPut(6 * i + 3) = gDof(3)
+                        dofPut(6 * i + 4) = gDof(4)
+                        dofPut(6 * i + 5) = gDof(5)
                     Next
-                    rc = el.PutNodeList(0, nodecount, n, f, w, dof)
+                    rc = el.PutNodeList(0, nodecount, nPut, fPut, wPut, dofPut)
                     If rc = C_FE_OK Then rc = el.Put(el.ID)
                 End If
             End If

@@ -30,6 +30,11 @@ Sub Main
     Dim face As Variant
     Dim weight As Variant
     Dim dof As Variant
+    Dim i As Long
+    Dim ndsPut() As Long
+    Dim facePut() As Long
+    Dim weightPut() As Double
+    Dim dofPut() As Long
 
     Set el = App.feElem()
     Set pick = App.feSet()
@@ -46,7 +51,27 @@ Sub Main
                     newRef = nds(0)
                     el.Node(0) = newRef
                     nds(0) = oldRef
-                    rc = el.PutNodeList(0, ndcount, nds, face, weight, dof)
+
+                    ' N4W 2004 cannot safely pass the Variant arrays returned by
+                    ' GetNodeList straight back into PutNodeList.  Copy the same
+                    ' data into typed one-dimensional arrays before writing it.
+                    ReDim ndsPut(ndcount - 1)
+                    ReDim facePut(ndcount - 1)
+                    ReDim weightPut(ndcount - 1)
+                    ReDim dofPut(ndcount * 6 - 1)
+
+                    For i = 0 To ndcount - 1
+                        ndsPut(i) = CLng(nds(i))
+                        facePut(i) = CLng(face(i))
+                        weightPut(i) = CDbl(weight(i))
+                    Next
+
+                    For i = 0 To ndcount * 6 - 1
+                        dofPut(i) = CLng(dof(i))
+                    Next
+
+                    ndsPut(0) = oldRef
+                    rc = el.PutNodeList(0, ndcount, ndsPut, facePut, weightPut, dofPut)
                     If rc = C_FE_OK Then rc = el.Put(elID)
                     If rc = C_FE_OK Then
                         count = count + 1

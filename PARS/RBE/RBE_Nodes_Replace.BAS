@@ -33,6 +33,10 @@ Sub Main
     Dim face As Variant
     Dim weight As Variant
     Dim dof As Variant
+    Dim ndsPut() As Long
+    Dim facePut() As Long
+    Dim weightPut() As Double
+    Dim dofPut() As Long
 
     Set el = App.feElem()
     Set epick = App.feSet()
@@ -44,7 +48,24 @@ Sub Main
         rc = el.Get(elID)
         If (rc = C_FE_OK) And (el.type = C_FET_RIGID) And (el.topology = C_FTO_RIGID) Then
             rc = el.GetNodeList(0, ndcount, nds, face, weight, dof)
-            If rc = C_FE_OK Then
+            If (rc = C_FE_OK) And (ndcount > 0) Then
+                ' N4W 2004 cannot safely pass the Variant arrays returned by
+                ' GetNodeList straight back into PutNodeList. Preserve the
+                ' existing values in typed one-dimensional arrays.
+                ReDim ndsPut(ndcount - 1)
+                ReDim facePut(ndcount - 1)
+                ReDim weightPut(ndcount - 1)
+                ReDim dofPut(ndcount * 6 - 1)
+
+                For i = 0 To ndcount - 1
+                    ndsPut(i) = CLng(nds(i))
+                    facePut(i) = CLng(face(i))
+                    weightPut(i) = CDbl(weight(i))
+                Next
+                For i = 0 To ndcount * 6 - 1
+                    dofPut(i) = CLng(dof(i))
+                Next
+
                 found = False
                 Do While Not found
                     rc = npick.SelectID(C_FT_NODE, "Select listed node to replace:", oldNode)
@@ -61,7 +82,8 @@ Sub Main
                 rc = npick.SelectID(C_FT_NODE, "Select replacement node:", newNode)
                 If rc <> C_FE_OK Then GoTo ExitHere
                 nds(i) = newNode
-                rc = el.PutNodeList(0, ndcount, nds, face, weight, dof)
+                ndsPut(i) = newNode
+                rc = el.PutNodeList(0, ndcount, ndsPut, facePut, weightPut, dofPut)
                 If rc = C_FE_OK Then rc = el.Put(elID)
                 If rc = C_FE_OK Then Call App.feAppMessage(C_FCM_NORMAL, "Updated rigid element " & CStr(elID) & ": node " & CStr(oldNode) & " -> " & CStr(newNode) & ".")
                 Call App.feViewRegenerate(1)
