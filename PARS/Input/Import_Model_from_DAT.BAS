@@ -4,7 +4,9 @@
 '              Restores coordinate-system, load-set, constraint-set and
 '              property titles, beam/bar shape/orientation data, and named Groups
 '              from GROUP/SET1 metadata comments.
-' Compatibility: Nastran for Windows 2004 and modern FEMAP.
+' Compatibility: original N4W 2004 ($ MSC.Nastran for Windows ...),
+'                modern FEMAP ($ Femap with NX Nastran ...), and
+'                custom $ GROUP / SET1 interchange comments.
 ' =============================================================================
 
 Option Explicit
@@ -73,7 +75,7 @@ Sub Main()
         If rc <> C_FE_OK Then Exit Do
         lineText = f.Line
 
-        If IsCommentLine(lineText) Then
+        If IsDressingMetadata(lineText) Then
             If InStr(1, lineText, "Coordinate System ") > 0 Then
                 rc = UpdateNamedEntity(App, lineText, "Coordinate System ", 1)
                 If rc = 1 Then
@@ -1016,4 +1018,18 @@ Private Function IsCommentLine(ByVal lineText As String) As Boolean
 
     s = Trim$(lineText)
     IsCommentLine = (Len(s) > 0 And Left$(s, 1) = "$")
+End Function
+
+' Accept both native Nastran for Windows and FEMAP comment dialects.
+' Group transport is handled separately by CreateGroupsFromSetComments.
+Private Function IsDressingMetadata(ByVal lineText As String) As Boolean
+    Dim s As String
+    s = Trim$(lineText)
+    IsDressingMetadata = False
+    If Left$(s, 1) <> "$" Then Exit Function
+    If InStr(1, s, "$ MSC.Nastran for Windows ") = 1 Then
+        IsDressingMetadata = True
+    ElseIf InStr(1, s, "$ Femap with NX Nastran ") = 1 Then
+        IsDressingMetadata = True
+    End If
 End Function
